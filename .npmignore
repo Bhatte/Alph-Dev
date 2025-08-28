@@ -1,0 +1,68 @@
+# Source files
+src/
+tests/
+test/
+
+# Development files
+.eslintrc.js
+.prettierrc
+.prettierignore
+jest.config.js
+tsconfig.json
+
+# Build artifacts
+coverage/
+*.tsbuildinfo
+
+# Development dependencies
+node_modules/
+
+# Version control
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+.tmp/
+.temp/
+
+# Documentation source (keep README.md)
+docs/
+*.md
+!README.md
+
+# Spec files
+.kiro/
+
+# Archive
+archive/
+
+# Scripts
+scripts/
+Makefile
+
+# Other project files
+CONTRIBUTING.md
+TROUBLESHOOTING.md
+USER_GUIDE.md

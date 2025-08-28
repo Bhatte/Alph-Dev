@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "moduleResolution": "Node16",
+    "types": ["jest", "node"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": [
+    "**/*",
+    "../src/**/*"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist"
+  ]
+}
