@@ -4,11 +4,17 @@
 
 ## Overview
 
-`alph` is a Node.js/TypeScript CLI tool that provides frictionless installation through NPM for managing MCP server configurations across multiple AI agents. It addresses user adoption barriers through the familiar NPM ecosystem while maintaining robust functionality.
+Configure MCP servers for your AI agents in one command. Alph is a local-first CLI that safely edits agent config files for Gemini, Cursor, Claude, and more — using atomic writes, automatic backups, and easy rollback. No network calls. No lost configs. Just reliable setup.
 
 ## Demo
 
 ![Alph Demo](demo-alph.gif)
+
+## The Problem
+Modern AI agents support MCP servers but setting them up means editing fragile local config files per tool and per OS. It’s easy to misplace entries, corrupt JSON, or leak credentials.
+
+## Alph-cli
+Alph CLI automates safe, repeatable MCP configuration across agents. It detects installations, previews changes (--dry-run), performs atomic writes, and creates timestamped backups with fast rollback.
 
 ## Features
 
@@ -25,6 +31,7 @@
 - **Cursor** (platform-specific configuration locations)
 - **Claude Code** (Claude-specific configuration format)
 - **Generic Provider** (custom configuration files)
+- ✅ Want another agent? Open a feature request (template below)
 
 ## Installation
 
@@ -38,8 +45,6 @@ npm install -g @aqualia/alph-cli
 - NPM (comes with Node.js)
 
 ## Usage
-
-Alph now uses a subcommand-based CLI.
 
 ### Quick start (interactive)
 
@@ -110,6 +115,10 @@ alph remove [options]
       --no-backup                   Do not create backups before removal (advanced)
 ```
 
+## Why Alph?
+1. **Security**: Local-first design — no network requests and sensitive values are redacted in output.
+2. **Simplicity**: One command configures multiple agents; no manual JSON editing.
+3. **Reliability**: Atomic writes, validation, and automatic backups mean you can always roll back.
 
 ## How It Works
 
@@ -119,37 +128,6 @@ alph remove [options]
 4. **Validation**: Verifies configuration integrity after modifications
 5. **Rollback**: Provides easy recovery if issues occur
 
-## Configuration Details
-
-### Gemini CLI
-
-Modifies `~/.gemini/settings.json` to add MCP server configuration:
-
-```json
-{
-  "mcpServers": {
-    "your-server-id": {
-      "httpUrl": "https://askhuman.net/mcp/your-server-id"
-    }
-  }
-}
-```
-
-### Cursor
-
-Updates Cursor's configuration with MCP server details in the appropriate platform-specific location.
-
-### Claude Code
-
-Integrates MCP server settings into Claude's configuration format.
-
-## Safety Features
-
-- **Atomic Operations**: All file modifications use atomic write operations
-- **Automatic Backups**: Timestamped backups created before changes (can be disabled for removals with `--no-backup`)
-- **Validation**: Configuration integrity verified after modifications
-- **Error Recovery**: Clear error messages and rollback instructions
-- **No Network Calls**: Operates entirely on local files for security
 
 ## Documentation
 
@@ -158,72 +136,6 @@ Integrates MCP server settings into Claude's configuration format.
 - [USER_GUIDE.md](./USER_GUIDE.md) — usage examples and command reference
 - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common issues and resolutions
 
-## Development
-
-### Building from Source
-
-```bash
-git clone https://github.com/Aqualia/Alph.git
-cd Alph
-npm install
-npm run build
-```
-
-### Running Tests
-
-```bash
-npm test                # Run all tests
-npm run test:coverage   # Run tests with coverage
-npm run test:watch      # Run tests in watch mode
-```
-
-### Development Scripts
-
-```bash
-npm run dev            # Build in watch mode
-npm run lint           # Run ESLint
-npm run lint:fix       # Fix ESLint issues
-npm run format         # Format code with Prettier
-npm run typecheck      # Run TypeScript type checking
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Command not found after installation**
-```bash
-# Ensure NPM global bin directory is in your PATH
-npm config get prefix
-# Add the bin directory to your PATH if needed
-```
-
-**Permission errors**
-```bash
-# On macOS/Linux, you might need to fix NPM permissions
-sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
-```
-
-**Configuration file not found**
-- Ensure your AI agent is properly installed
-- Check that configuration files exist in expected locations
-- Use the generic provider for custom installation paths
-
-### Getting Help
-
-- Check the [GitHub Issues](https://github.com/Aqualia/Alph/issues)
-- Review the [troubleshooting guide](https://github.com/Aqualia/Alph/blob/main/TROUBLESHOOTING.md)
-- Run `alph --help` for command-line help
-
-## Alternative Installation Methods (roadmap)
-
-NPM global install is the supported method today. Additional options under consideration:
-
-1. **Package Managers**: Future support (e.g., Homebrew, Winget, Chocolatey)
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
