@@ -219,8 +219,7 @@ sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
 
 NPM global install is the supported method today. Additional options under consideration:
 
-1. **Build from Source**: Clone the repository and build locally (TypeScript/Node)
-2. **Package Managers**: Future support (e.g., Homebrew, Winget, Chocolatey)
+1. **Package Managers**: Future support (e.g., Homebrew, Winget, Chocolatey)
 
 ## Contributing
 
