@@ -10,6 +10,10 @@ Configure MCP servers for your AI agents in one command. Alph is a local-first C
 
 ![Alph Demo](demo-alph.gif)
 
+[![npm version](https://img.shields.io/npm/v/@aqualia/alph-cli)](https://www.npmjs.com/package/@aqualia/alph-cli)
+[![npm downloads](https://img.shields.io/npm/dm/@aqualia/alph-cli)](https://www.npmjs.com/package/@aqualia/alph-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 ## The Problem
 Modern AI agents support MCP servers but setting them up means editing fragile local config files per tool and per OS. It’s easy to misplace entries, corrupt JSON, or leak credentials.
 
