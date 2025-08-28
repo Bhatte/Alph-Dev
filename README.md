@@ -135,7 +135,13 @@ alph remove [options]
 - [SECURITY.md](./SECURITY.md) — security model, secret handling, backups/rollback
 - [USER_GUIDE.md](./USER_GUIDE.md) — usage examples and command reference
 - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common issues and resolutions
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards and enforcement
 
+
+## Code of Conduct
+
+We follow the [Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). By participating, you agree to abide by its terms. For any concerns, contact hello@aqualia.ie.
 
 ## License
 

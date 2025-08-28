@@ -1,0 +1,57 @@
+name: "🐛 Bug report"
+description: Report a reproducible problem with Alph CLI
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill out all required fields.
+  - type: input
+    id: version
+    attributes:
+      label: Alph version
+      description: Output of `alph --version` and `node -v`
+      placeholder: e.g., alph 0.1.16, Node v20.11.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: ["macOS", "Linux", "Windows"]
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the issue and what you expected to happen.
+      placeholder: Tell us what you see and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, step-by-step reproduction.
+      placeholder: |
+        1. Run `alph ...`
+        2. Open ...
+        3. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Paste relevant output (redact tokens). Use `alph --verbose` if helpful.
+      render: bash
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I’ve searched existing issues.
+          required: true
+        - label: I’m using the latest version.
+          required: true

@@ -1,0 +1,37 @@
+name: "💡 Feature request"
+description: Propose an enhancement or new agent integration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What problem will this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior and CLI flags/options.
+      placeholder: e.g., `alph setup --agents vscode-copilot --dir ...`
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: New agent support
+        - label: UX improvement
+        - label: Safety / rollback
+        - label: Docs / examples
+  - type: input
+    id: refs
+    attributes:
+      label: References
+      description: Links to agent docs or related repos
