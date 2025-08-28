@@ -143,6 +143,12 @@ alph remove [options]
 
 We follow the [Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). By participating, you agree to abide by its terms. For any concerns, contact hello@aqualia.ie.
 
+## Feature Requests & Issues
+
+- Open issues: https://github.com/Aqualia/Alph/issues
+- New feature request: https://github.com/Aqualia/Alph/issues/new?template=feature_request.yml
+- New bug report: https://github.com/Aqualia/Alph/issues/new?template=bug_report.yml
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
