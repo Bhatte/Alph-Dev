@@ -36,7 +36,6 @@ Alph CLI automates safe, repeatable MCP configuration across agents. It detects 
 - **Cursor** (platform-specific configuration locations)
 - **Claude Code** (Claude-specific configuration format)
 - **Generic Provider** (custom configuration files)
-- ✅ Want another agent? Open a feature request (template below)
 
 ## Installation
 
