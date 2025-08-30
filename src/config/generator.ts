@@ -166,39 +166,13 @@ export class DefaultConfigGenerator implements ConfigGenerator {
   async getDefaultConfigPath(agentType: AgentType): Promise<string> {
     const homeDir = process.env['HOME'] || os.homedir();
 
-    // Use stubbed platform if available for testing
-    const platform = process.env['TEST_PLATFORM'] || process.env['OS_PLATFORM'] || os.platform();
-
     switch (agentType) {
       case 'gemini':
         return path.join(homeDir, '.gemini', 'settings.json');
       
       case 'cursor':
-        if (platform === 'win32') {
-          return path.join(
-            process.env['APPDATA'] || path.join(homeDir, 'AppData', 'Roaming'),
-            'Cursor',
-            'User',
-            'settings.json'
-          );
-        } else if (platform === 'darwin') {
-          return path.join(
-            homeDir,
-            'Library',
-            'Application Support',
-            'Cursor',
-            'User',
-            'settings.json'
-          );
-        } else {
-          // Linux and other platforms
-          return path.join(
-            process.env['XDG_CONFIG_HOME'] || path.join(homeDir, '.config'),
-            'Cursor',
-            'User',
-            'settings.json'
-          );
-        }
+        // Prefer the official MCP configuration path consistently across platforms
+        return path.join(homeDir, '.cursor', 'mcp.json');
       
       case 'claude':
         return path.join(homeDir, '.claude', 'config.json');

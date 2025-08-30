@@ -54,6 +54,15 @@ export class CursorProvider implements AgentProvider {
   }
 
   /**
+   * Determines if a given path points to a legacy settings.json-based location
+   * rather than the preferred ~/.cursor/mcp.json file.
+   */
+  private isLegacySettingsPath(p: string | null | undefined): boolean {
+    if (!p) return false;
+    return /(^|[\/\\])settings\.json$/i.test(p);
+  }
+
+  /**
    * Detects if Cursor IDE is installed and configured on the system
    * 
    * @param configDir - Optional custom configuration directory
@@ -136,6 +145,15 @@ export class CursorProvider implements AgentProvider {
     } else if (!this.configPath) {
       const detectedPath = await this.detect();
       this.configPath = detectedPath || this.getDefaultConfigPath();
+    }
+
+    // If no explicit configDir is provided, prefer the official ~/.cursor/mcp.json file
+    // even if a legacy settings.json was detected. We do not migrate existing data here.
+    if (!config.configDir || !config.configDir.trim()) {
+      const preferredPath = this.getDefaultConfigPath();
+      if (this.isLegacySettingsPath(this.configPath) && this.configPath !== preferredPath) {
+        this.configPath = preferredPath;
+      }
     }
 
     if (!this.configPath) {
