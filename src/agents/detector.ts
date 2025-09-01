@@ -158,14 +158,14 @@ export class AgentDetector {
     switch (currentPlatform) {
       case 'win32': {
         const appData = process.env['APPDATA'] || join(home, 'AppData', 'Roaming');
-        return resolve(join(appData, 'Claude', 'settings.json'));
+        return resolve(join(appData, 'Claude', 'mcp.json'));
       }
       case 'darwin':
-        return resolve(join(home, 'Library', 'Application Support', 'Claude', 'settings.json'));
+        return resolve(join(home, 'Library', 'Application Support', 'Claude', 'mcp.json'));
       case 'linux':
       default: {
         const configHome = process.env['XDG_CONFIG_HOME'] || join(home, '.config');
-        return resolve(join(configHome, 'claude', 'settings.json'));
+        return resolve(join(configHome, 'claude', 'mcp.json'));
       }
     }
   }
@@ -177,54 +177,22 @@ export class AgentDetector {
 
     switch (currentPlatform) {
       case 'win32': {
-        const appDataRoaming = process.env['APPDATA'] || join(home, 'AppData', 'Roaming');
-        const appDataLocal = process.env['LOCALAPPDATA'] || join(home, 'AppData', 'Local');
-        const programFiles = process.env['PROGRAMFILES'] || join('C:', 'Program Files');
-        const programFilesX86 = process.env['PROGRAMFILES(X86)'] || join('C:', 'Program Files (x86)');
-        
+        const appData = process.env['APPDATA'] || join(home, 'AppData', 'Roaming');
         paths.push(
-          join(appDataRoaming, 'Claude', 'settings.json'),
-          join(appDataLocal, 'Claude', 'settings.json'),
-          join(appDataRoaming, 'Claude Code', 'settings.json'),
-          join(appDataLocal, 'Claude Code', 'settings.json'),
-          join(appDataRoaming, 'Anthropic', 'Claude', 'settings.json'),
-          join(appDataLocal, 'Anthropic', 'Claude', 'settings.json'),
-          // Additional paths for different installation methods
-          join(programFiles, 'Claude Code', 'resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
-          join(programFilesX86, 'Claude Code', 'resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
-          // User-specific paths
-          join(home, 'AppData', 'Roaming', 'Claude', 'settings.json'),
-          join(home, 'AppData', 'Local', 'Claude', 'settings.json'),
+          join(appData, 'Claude', 'mcp.json')
         );
         break;
       }
       case 'darwin':
         paths.push(
-          join(home, 'Library', 'Application Support', 'Claude', 'settings.json'),
-          join(home, 'Library', 'Application Support', 'Claude Code', 'settings.json'),
-          join(home, 'Library', 'Application Support', 'Anthropic', 'Claude', 'settings.json'),
-          join(home, 'Library', 'Preferences', 'Claude', 'settings.json'),
-          join(home, 'Library', 'Preferences', 'com.anthropic.claude', 'settings.json'),
-          // Additional paths for different installation methods
-          join('/Applications', 'Claude Code.app', 'Contents', 'Resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
-          // User-specific paths
-          join(home, 'Applications', 'Claude Code.app', 'Contents', 'Resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
+          join(home, 'Library', 'Application Support', 'Claude', 'mcp.json')
         );
         break;
       case 'linux':
       default: {
         const configHome = process.env['XDG_CONFIG_HOME'] || join(home, '.config');
         paths.push(
-          join(configHome, 'claude', 'settings.json'),
-          join(configHome, 'Claude', 'settings.json'),
-          join(configHome, 'claude-code', 'settings.json'),
-          join(configHome, 'anthropic', 'claude', 'settings.json'),
-          join(home, '.claude', 'settings.json'),
-          // Additional paths for different installation methods
-          join('/usr', 'share', 'claude-code', 'resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
-          join(home, '.local', 'share', 'claude-code', 'resources', 'app', 'out', 'vs', 'code', 'electron-sandbox', 'workbench', 'settings.json'),
-          // Snap package path
-          join(home, 'snap', 'claude-code', 'current', '.config', 'claude', 'settings.json'),
+          join(configHome, 'claude', 'mcp.json')
         );
         break;
       }
@@ -277,7 +245,7 @@ export class AgentDetector {
           customPath = join(configDir, '.cursor', 'mcp.json');
           break;
         case 'claude':
-          customPath = join(configDir, '.claude', 'settings.json');
+          customPath = join(configDir, '.claude', 'mcp.json');
           break;
       }
       
@@ -308,7 +276,7 @@ export class AgentDetector {
           } else if (agent === 'cursor') {
             extra.push(join(root, '.config', 'Cursor', 'User', 'settings.json'));
           } else if (agent === 'claude') {
-            extra.push(join(root, '.config', 'claude', 'settings.json'));
+            extra.push(join(root, '.config', 'claude', 'mcp.json'));
           }
         }
         candidates = [...extra.map(p => resolve(p)), ...candidates];

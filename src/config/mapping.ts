@@ -69,7 +69,7 @@ export function toUnifiedFromClaude(cfg: ClaudeConfig, includeTokens = false): U
       ? { strategy: 'bearer' }
       : undefined;
 
-    const endpoint = s.url || s.httpUrl;
+    const endpoint = s.url;
     const entry: UnifiedMCPServer = {
       id,
       enabled: s.disabled === true ? false : true,

@@ -61,8 +61,8 @@ describe.skip('Migrate Command Integration (removed)', () => {
       }
     }, null, 2));
 
-    // Claude: ~/.claude/settings.json under configDir override
-    await sandbox.createFile(path.relative(root, path.join(root, '.claude', 'settings.json')), JSON.stringify({
+    // Claude: ~/.claude/mcp.json under configDir override
+    await sandbox.createFile(path.relative(root, path.join(root, '.claude', 'mcp.json')), JSON.stringify({
       mcpServers: {
         'claude-srv': {
           transport: 'http',

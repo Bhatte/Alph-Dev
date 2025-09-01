@@ -157,26 +157,29 @@ export interface CursorConfig {
 
 /**
  * Claude Code configuration structure.
- * Based on Claude Code's configuration format for MCP servers.
+ * Based on Claude Code's mcp.json configuration format for MCP servers.
  */
 export interface ClaudeConfig {
   /** MCP server configurations */
   mcpServers?: {
     [serverName: string]: {
-      /** Server endpoint URL */
-      url?: string;
+      /** Command to execute for stdio transport */
+      command?: string;
       
-      /** HTTP URL for HTTP transport */
-      httpUrl?: string;
+      /** Arguments for the command */
+      args?: string[];
+      
+      /** Environment variables */
+      env?: Record<string, string>;
+      
+      /** Server endpoint URL for HTTP transport */
+      url?: string;
       
       /** Authentication headers */
       headers?: Record<string, string>;
       
       /** Transport protocol */
       transport?: 'http' | 'sse' | 'stdio';
-      
-      /** Server configuration */
-      config?: Record<string, unknown>;
       
       /** Disabled state */
       disabled?: boolean;

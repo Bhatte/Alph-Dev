@@ -31,7 +31,7 @@ describe('ConfigGenerator Unit Tests', () => {
       const configPath = await generator.getDefaultConfigPath('cursor' as AgentType);
       
       expect(configPath).toContain('/Users/testuser');
-      expect(configPath).toContain('.config');
+      expect(configPath).toContain('.cursor');
     });
 
     it('should resolve Linux paths correctly', async () => {
@@ -40,7 +40,7 @@ describe('ConfigGenerator Unit Tests', () => {
       const configPath = await generator.getDefaultConfigPath('claude' as AgentType);
       
       expect(configPath).toContain('/home/testuser');
-      expect(configPath).toContain('.config');
+      expect(configPath).toContain('.claude');
     });
 
     it('should handle missing environment variables gracefully', async () => {

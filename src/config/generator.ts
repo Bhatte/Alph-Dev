@@ -1,6 +1,5 @@
 import { MCPServerConfig } from '../types/config';
-import * as os from 'os';
-import * as path from 'path';
+import { AgentDetector } from '../agents/detector';
 
 // Define AgentType locally to avoid circular dependencies
 export type AgentType = 'gemini' | 'cursor' | 'claude' | string;
@@ -164,18 +163,15 @@ export class DefaultConfigGenerator implements ConfigGenerator {
   }
 
   async getDefaultConfigPath(agentType: AgentType): Promise<string> {
-    const homeDir = process.env['HOME'] || os.homedir();
-
     switch (agentType) {
       case 'gemini':
-        return path.join(homeDir, '.gemini', 'settings.json');
+        return AgentDetector.getDefaultConfigPath('gemini');
       
       case 'cursor':
-        // Prefer the official MCP configuration path consistently across platforms
-        return path.join(homeDir, '.cursor', 'mcp.json');
+        return AgentDetector.getDefaultConfigPath('cursor');
       
       case 'claude':
-        return path.join(homeDir, '.claude', 'config.json');
+        return AgentDetector.getDefaultConfigPath('claude');
       
       default:
         throw new Error(`Unsupported agent type: ${agentType}`);

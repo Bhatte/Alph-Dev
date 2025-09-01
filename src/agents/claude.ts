@@ -11,10 +11,10 @@ import { AgentDetector } from './detector';
  * Claude Code provider for configuring Claude Code's MCP server settings
  * 
  * This provider handles detection and configuration of Claude Code,
- * which stores its configuration in platform-specific locations:
- * - Windows: %APPDATA%\Claude\settings.json
- * - macOS: ~/Library/Application Support/Claude/settings.json
- * - Linux: ~/.config/claude/settings.json
+ * which stores its MCP configuration in platform-specific locations:
+ * - Windows: %APPDATA%\Claude\mcp.json
+ * - macOS: ~/Library/Application Support/Claude/mcp.json
+ * - Linux: ~/.config/claude/mcp.json
  */
 export class ClaudeProvider implements AgentProvider {
   public readonly name = 'Claude Code';
@@ -33,11 +33,11 @@ export class ClaudeProvider implements AgentProvider {
   /**
    * Gets the default configuration path for Claude Code based on the current platform
    * @param configDir - Optional custom configuration directory
-   * @returns Default path to Claude settings.json
+   * @returns Default path to Claude mcp.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
     if (configDir) {
-      return join(configDir, '.claude', 'settings.json');
+      return join(configDir, '.claude', 'mcp.json');
     }
     return AgentDetector.getDefaultConfigPath('claude');
   }
@@ -351,24 +351,43 @@ export class ClaudeProvider implements AgentProvider {
     }
 
     // Create the MCP server configuration for Claude Code format
-    const serverConfig: Exclude<ClaudeConfig['mcpServers'], undefined>[string] = {
-      ...(config.mcpServerUrl !== undefined ? { url: config.mcpServerUrl } : {}),
-      ...(config.mcpServerUrl !== undefined ? { httpUrl: config.mcpServerUrl } : {}),
-      headers: {
-        // Claude requires JSON payloads; include Content-Type and Authorization (if provided)
-        'Content-Type': 'application/json',
-        ...(config.mcpAccessKey ? { Authorization: `Bearer ${config.mcpAccessKey}` } : {}),
-        ...(config.headers || {})
-      },
-      transport: config.transport || 'http',
-      config: {
-        // Claude-specific configuration options
-        timeout: 30000,
-        retries: 3,
-        ...config.env // Include environment variables as config options
-      },
-      disabled: false
-    };
+    const serverConfig: Exclude<ClaudeConfig['mcpServers'], undefined>[string] = {};
+
+    // Handle different transport types
+    if (config.transport === 'stdio' || config.command) {
+      // Command-based MCP server
+      if (config.command) {
+        serverConfig.command = config.command;
+      }
+      if (config.args && config.args.length > 0) {
+        serverConfig.args = config.args;
+      }
+      if (config.env && Object.keys(config.env).length > 0) {
+        serverConfig.env = config.env;
+      }
+    } else {
+      // HTTP-based MCP server
+      if (config.mcpServerUrl) {
+        serverConfig.url = config.mcpServerUrl;
+      }
+      if (config.headers && Object.keys(config.headers).length > 0) {
+        serverConfig.headers = config.headers;
+      }
+      if (config.mcpAccessKey) {
+        if (!serverConfig.headers) {
+          serverConfig.headers = {};
+        }
+        serverConfig.headers['Authorization'] = `Bearer ${config.mcpAccessKey}`;
+      }
+    }
+
+    // Set transport if specified
+    if (config.transport) {
+      serverConfig.transport = config.transport;
+    }
+
+    // Set disabled state
+    serverConfig.disabled = false;
 
     // Inject the server configuration
     modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
@@ -429,12 +448,21 @@ export class ClaudeProvider implements AgentProvider {
             return false;
           }
 
-          // Validate URL fields
-          if (serverConfig.url && typeof serverConfig.url !== 'string') {
+          // Validate command fields for stdio transport
+          if (serverConfig.command && typeof serverConfig.command !== 'string') {
             return false;
           }
 
-          if (serverConfig.httpUrl && typeof serverConfig.httpUrl !== 'string') {
+          if (serverConfig.args && !Array.isArray(serverConfig.args)) {
+            return false;
+          }
+
+          if (serverConfig.env && typeof serverConfig.env !== 'object') {
+            return false;
+          }
+
+          // Validate URL field for HTTP transport
+          if (serverConfig.url && typeof serverConfig.url !== 'string') {
             return false;
           }
 
@@ -443,11 +471,7 @@ export class ClaudeProvider implements AgentProvider {
             return false;
           }
 
-          if (serverConfig.transport && !['http', 'sse'].includes(serverConfig.transport)) {
-            return false;
-          }
-
-          if (serverConfig.config && typeof serverConfig.config !== 'object') {
+          if (serverConfig.transport && !['http', 'sse', 'stdio'].includes(serverConfig.transport)) {
             return false;
           }
 
@@ -463,10 +487,17 @@ export class ClaudeProvider implements AgentProvider {
             return false;
           }
 
-          // Validate URL matches
-          if (serverConfig.url !== expectedMCPConfig.mcpServerUrl && 
-              serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
-            return false;
+          // Validate based on transport type
+          if (expectedMCPConfig.transport === 'stdio' || expectedMCPConfig.command) {
+            // For stdio transport, validate command
+            if (expectedMCPConfig.command && serverConfig.command !== expectedMCPConfig.command) {
+              return false;
+            }
+          } else {
+            // For HTTP transport, validate URL
+            if (expectedMCPConfig.mcpServerUrl && serverConfig.url !== expectedMCPConfig.mcpServerUrl) {
+              return false;
+            }
           }
 
           // Validate transport if specified
