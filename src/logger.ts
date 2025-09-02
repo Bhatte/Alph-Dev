@@ -1,4 +1,8 @@
 import { inspect } from 'util';
+import { createWriteStream, WriteStream } from 'fs';
+import { dirname } from 'path';
+import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
@@ -63,6 +67,42 @@ interface LoggerOptions {
    * Custom formatter for log messages
    */
   formatter?: (level: 'debug' | 'info' | 'warn' | 'error', message: string, ...args: unknown[]) => string;
+  
+  /**
+   * Enable file logging
+   * @default false
+   */
+  fileLogging?: boolean;
+  
+  /**
+   * Log file path
+   * @default './logs/alph.log'
+   */
+  logFile?: string;
+  
+  /**
+   * Maximum log file size in bytes before rotation
+   * @default 10MB
+   */
+  maxFileSize?: number;
+  
+  /**
+   * Number of log files to keep
+   * @default 5
+   */
+  maxFiles?: number;
+  
+  /**
+   * Enable JSON logging format for file output
+   * @default false
+   */
+  jsonLogging?: boolean;
+  
+  /**
+   * Enable log rotation
+   * @default true
+   */
+  rotate?: boolean;
 }
 
 const LEVELS = {
@@ -120,29 +160,147 @@ export class ConsoleLogger implements Logger {
   private readonly stderrForErrors: boolean;
   private readonly formatter: NonNullable<LoggerOptions['formatter']>;
   
+  // File logging properties
+  private readonly fileLogging: boolean;
+  private readonly logFile?: string;
+  private readonly maxFileSize: number;
+  private readonly maxFiles: number;
+  private readonly jsonLogging: boolean;
+  private readonly rotate: boolean;
+  private fileStream: WriteStream | null = null;
+  private currentFileSize: number = 0;
+  
   constructor(options: LoggerOptions = {}) {
     this.level = LEVELS[options.level || 'info'];
     this.colors = options.colors !== false;
     this.timestamps = options.timestamps !== false;
     this.stderrForErrors = options.stderrForErrors !== false;
     
+    // File logging options
+    this.fileLogging = options.fileLogging || false;
+    this.logFile = options.logFile || './logs/alph.log';
+    this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024; // 10MB
+    this.maxFiles = options.maxFiles || 5;
+    this.jsonLogging = options.jsonLogging || false;
+    this.rotate = options.rotate !== false;
+    
     // Use custom formatter or default
     this.formatter = options.formatter || this.defaultFormatter.bind(this);
+    
+    // Initialize file logging if enabled
+    if (this.fileLogging && this.logFile) {
+      this.initializeFileLogging().catch(error => {
+        console.error('Failed to initialize file logging:', error);
+      });
+    }
+  }
+
+  private async initializeFileLogging(): Promise<void> {
+    try {
+      if (!this.logFile) return;
+
+      // Ensure log directory exists
+      const logDir = dirname(this.logFile);
+      await fs.mkdir(logDir, { recursive: true });
+
+      // Create write stream
+      this.fileStream = createWriteStream(this.logFile, { flags: 'a' });
+    } catch (error) {
+      console.error('Failed to initialize file logging:', error);
+    }
+  }
+
+  private async rotateLogFile(): Promise<void> {
+    if (!this.rotate || !this.logFile || !this.fileStream) return;
+
+    try {
+      // Close current stream
+      this.fileStream.close();
+
+      // Rotate files
+      for (let i = this.maxFiles - 1; i > 0; i--) {
+        const oldFile = `${this.logFile}.${i}`;
+        const newFile = `${this.logFile}.${i + 1}`;
+        try {
+          if (fsSync.existsSync(oldFile)) {
+            fsSync.renameSync(oldFile, newFile);
+          }
+        } catch (error) {
+          // Ignore errors during rotation
+        }
+      }
+
+      // Move current log to .1
+      if (fsSync.existsSync(this.logFile)) {
+        fsSync.renameSync(this.logFile, `${this.logFile}.1`);
+      }
+
+      // Create new log file
+      await this.initializeFileLogging();
+    } catch (error) {
+      console.error('Failed to rotate log file:', error);
+    }
+  }
+
+  private async writeToFile(message: string): Promise<void> {
+    if (!this.fileStream || !this.logFile) return;
+
+    try {
+      // Check if rotation is needed
+      this.currentFileSize += message.length;
+      if (this.currentFileSize > this.maxFileSize) {
+        await this.rotateLogFile();
+        this.currentFileSize = message.length;
+      }
+
+      // Write to file
+      this.fileStream.write(message + '\n', (error: Error | null | undefined) => {
+        if (error) {
+          console.error('Failed to write to log file:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to write to log file:', error);
+    }
   }
   
   debug(message: string, ...args: unknown[]): void {
     if (this.level > LEVELS.debug) return;
     this.log('debug', message, ...args);
+    
+    if (this.fileLogging && this.logFile) {
+      const timestamp = new Date().toISOString();
+      const logMessage = this.jsonLogging
+        ? JSON.stringify({ timestamp, level: 'DEBUG', message, args })
+        : `[${timestamp}] DEBUG ${message}${args.length > 0 ? ' ' + JSON.stringify(args) : ''}`;
+      this.writeToFile(logMessage).catch(err => console.error('File logging error:', err));
+    }
   }
   
   info(message: string, ...args: unknown[]): void {
     if (this.level > LEVELS.info) return;
     this.log('info', message, ...args);
+    
+    if (this.fileLogging && this.logFile) {
+      const timestamp = new Date().toISOString();
+      const logMessage = this.jsonLogging
+        ? JSON.stringify({ timestamp, level: 'INFO', message, args })
+        : `[${timestamp}] INFO ${message}${args.length > 0 ? ' ' + JSON.stringify(args) : ''}`;
+      this.writeToFile(logMessage).catch(err => console.error('File logging error:', err));
+    }
   }
   
   warn(message: string, ...args: unknown[]): void {
     if (this.level > LEVELS.warn) return;
     this.log('warn', message, ...args);
+    
+    if (this.fileLogging && this.logFile) {
+      const timestamp = new Date().toISOString();
+      const logMessage = this.jsonLogging
+        ? JSON.stringify({ timestamp, level: 'WARN', message, args })
+        : `[${timestamp}] WARN ${message}${args.length > 0 ? ' ' + JSON.stringify(args) : ''}`;
+      this.writeToFile(logMessage).catch(err => console.error('File logging error:', err));
+    }
   }
   
   error(message: string, ...args: unknown[]): void {
@@ -151,6 +309,14 @@ export class ConsoleLogger implements Logger {
     // Special handling for AlphError
     const formattedMessage = this.formatError(message, ...args);
     this.log('error', formattedMessage);
+    
+    if (this.fileLogging && this.logFile) {
+      const timestamp = new Date().toISOString();
+      const logMessage = this.jsonLogging
+        ? JSON.stringify({ timestamp, level: 'ERROR', message: formattedMessage, args })
+        : `[${timestamp}] ERROR ${formattedMessage}${args.length > 0 ? ' ' + JSON.stringify(args) : ''}`;
+      this.writeToFile(logMessage).catch(err => console.error('File logging error:', err));
+    }
   }
 
   logStructured(level: 'debug' | 'info' | 'warn' | 'error', data: LogEntry): void {
@@ -172,6 +338,14 @@ export class ConsoleLogger implements Logger {
       process.stderr.write(jsonLine + '\n');
     } else {
       process.stdout.write(jsonLine + '\n');
+    }
+    
+    // Write to file if file logging is enabled
+    if (this.fileLogging && this.logFile) {
+      const logMessage = this.jsonLogging
+        ? jsonLine
+        : `[${entry.timestamp}] ${level.toUpperCase()} ${entry.message}`;
+      this.writeToFile(logMessage).catch(err => console.error('File logging error:', err));
     }
   }
 

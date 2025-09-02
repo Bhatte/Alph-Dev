@@ -2,8 +2,7 @@ import { MCPServerConfig } from '../types/config';
 import { ConfigGenerator, createConfigGenerator } from './generator';
 import { ConfigInstaller, createConfigInstaller, InstallOptions, InstallResult } from './installer';
 import { ensureDirectory } from '../utils/directory';
-import { Logger } from '../logger';
-import { createEnhancedLogger } from '../enhancedLogger';
+import { Logger, createLogger } from '../logger';
 import { ConfigValidator, createConfigValidator } from './validator';
 import { join, dirname } from 'path';
 import { promises as fs } from 'fs';
@@ -54,12 +53,9 @@ export class ConfigManager {
   private configDir: string;
 
   constructor(options: ConfigManagerOptions = {}) {
-    this.logger = options.logger || createEnhancedLogger({
+    this.logger = options.logger || createLogger({
       level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
-      colors: process.stdout.isTTY,
-      fileLogging: process.env['NODE_ENV'] === 'production',
-      logFile: './logs/alph.log',
-      jsonLogging: true
+      colors: process.stdout.isTTY
     });
     this.verbose = options.verbose || false;
     // Config directory will be set by the factory function

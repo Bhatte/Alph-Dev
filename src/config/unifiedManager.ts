@@ -4,7 +4,7 @@ import { ensureDirectory, getDefaultConfigDir } from '../utils/directory';
 import type { UnifiedConfig, UnifiedMCPServer } from '../types/unified';
 import { createConfigValidator } from './validator';
 import type { Logger } from '../logger';
-import { createEnhancedLogger } from '../enhancedLogger';
+import { createLogger } from '../logger';
 
 export interface UnifiedConfigManagerOptions {
   logger?: Logger;
@@ -16,11 +16,9 @@ export class UnifiedConfigManager {
   private userConfigDir: string;
 
   constructor(opts: UnifiedConfigManagerOptions = {}) {
-    this.logger = opts.logger || createEnhancedLogger({
+    this.logger = opts.logger || createLogger({
       level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
-      colors: process.stdout.isTTY,
-      fileLogging: false,
-      jsonLogging: false
+      colors: process.stdout.isTTY
     });
     this.userConfigDir = opts.configDir || getDefaultConfigDir('alph');
   }

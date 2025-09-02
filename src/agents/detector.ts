@@ -151,52 +151,32 @@ export class AgentDetector {
     return envPath ? [envPath, ...base] : base;
   }
 
-  // Claude
+  // Claude Code (not Claude Desktop)
   static getClaudeDefaultConfigPath(): string {
-    const currentPlatform = platform();
     const home = homedir();
-    switch (currentPlatform) {
-      case 'win32': {
-        const appData = process.env['APPDATA'] || join(home, 'AppData', 'Roaming');
-        return resolve(join(appData, 'Claude', 'mcp.json'));
-      }
-      case 'darwin':
-        return resolve(join(home, 'Library', 'Application Support', 'Claude', 'mcp.json'));
-      case 'linux':
-      default: {
-        const configHome = process.env['XDG_CONFIG_HOME'] || join(home, '.config');
-        return resolve(join(configHome, 'claude', 'mcp.json'));
-      }
-    }
+    // Main Claude.json has highest priority according to Claude Code docs
+    return resolve(join(home, '.claude', 'claude.json'));
   }
 
   static getClaudeConfigPaths(): string[] {
-    const currentPlatform = platform();
     const home = homedir();
     const paths: string[] = [];
 
-    switch (currentPlatform) {
-      case 'win32': {
-        const appData = process.env['APPDATA'] || join(home, 'AppData', 'Roaming');
-        paths.push(
-          join(appData, 'Claude', 'mcp.json')
-        );
-        break;
-      }
-      case 'darwin':
-        paths.push(
-          join(home, 'Library', 'Application Support', 'Claude', 'mcp.json')
-        );
-        break;
-      case 'linux':
-      default: {
-        const configHome = process.env['XDG_CONFIG_HOME'] || join(home, '.config');
-        paths.push(
-          join(configHome, 'claude', 'mcp.json')
-        );
-        break;
-      }
-    }
+    // Claude Code MCP configuration paths in priority order:
+    // 1. Main Claude.json (highest priority)
+    paths.push(join(home, '.claude', 'claude.json'));
+    
+    // 2. Config.json (commonly found)
+    paths.push(join(home, '.claude', 'config.json'));
+    
+    // 3. User-specific global settings
+    paths.push(join(home, '.claude', 'settings.json'));
+    
+    // 4. User-specific local settings  
+    paths.push(join(home, '.claude', 'settings.local.json'));
+    
+    // 5. Dedicated MCP file
+    paths.push(join(home, '.claude', 'mcp_servers.json'));
 
     return paths.map(p => resolve(p));
   }
@@ -245,7 +225,7 @@ export class AgentDetector {
           customPath = join(configDir, '.cursor', 'mcp.json');
           break;
         case 'claude':
-          customPath = join(configDir, '.claude', 'mcp.json');
+          customPath = join(configDir, '.claude', 'settings.local.json');
           break;
       }
       

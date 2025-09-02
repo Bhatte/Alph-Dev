@@ -1,17 +1,5 @@
-export interface MCPServerConfig {
-  name: string;
-  type: string;
-  config: {
-    [key: string]: any;
-    apiKey?: string;
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    serverUrl?: string;
-    authToken?: string;
-    autoUpdate?: boolean;
-  };
-}
+// Re-export MCPServerConfig from config.ts to maintain compatibility
+export type { MCPServerConfig } from './config';
 
 export interface ConfigValidationResult {
   valid: boolean;

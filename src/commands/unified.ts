@@ -13,7 +13,6 @@ import { executeConfigureCommand, ConfigureCommandOptions } from './configure';
 import { executeStatusCommand } from './status';
 import { executeRemoveCommand, RemoveCommandOptions } from './remove';
 import { startInteractiveConfig } from './interactive';
-// Migrate command removed
 
 /**
  * Unified command implementation

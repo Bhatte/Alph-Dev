@@ -11,10 +11,12 @@ import { AgentDetector } from './detector';
  * Claude Code provider for configuring Claude Code's MCP server settings
  * 
  * This provider handles detection and configuration of Claude Code,
- * which stores its MCP configuration in platform-specific locations:
- * - Windows: %APPDATA%\Claude\mcp.json
- * - macOS: ~/Library/Application Support/Claude/mcp.json
- * - Linux: ~/.config/claude/mcp.json
+ * which stores its MCP configuration in these locations (in priority order):
+ * 1. ~/.claude/claude.json (Main Claude.json - highest priority)
+ * 2. ~/.claude/settings.json (User-specific global)
+ * 3. ~/.claude/settings.local.json (User-specific local)
+ * 4. ~/.claude/mcp_servers.json (Dedicated MCP file)
+ * 5. Project-specific: .claude/settings.local.json (in project directory)
  */
 export class ClaudeProvider implements AgentProvider {
   public readonly name = 'Claude Code';
@@ -31,13 +33,13 @@ export class ClaudeProvider implements AgentProvider {
   }
 
   /**
-   * Gets the default configuration path for Claude Code based on the current platform
+   * Gets the default configuration path for Claude Code
    * @param configDir - Optional custom configuration directory
-   * @returns Default path to Claude mcp.json
+   * @returns Default path to Claude configuration file
    */
   protected getDefaultConfigPath(configDir?: string): string {
     if (configDir) {
-      return join(configDir, '.claude', 'mcp.json');
+      return join(configDir, '.claude', 'settings.local.json');
     }
     return AgentDetector.getDefaultConfigPath('claude');
   }
