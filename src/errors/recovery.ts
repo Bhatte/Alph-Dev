@@ -43,7 +43,7 @@ export class RecoveryManager {
     
     // Handle AlphError and its subclasses
     if (isErrorOfType(error, AlphError)) {
-      return this.getAxyncErrorRecovery(error);
+      return this.getAlphErrorRecovery(error);
     }
     
     // Handle Node.js system errors
@@ -55,9 +55,9 @@ export class RecoveryManager {
   }
   
   /**
-   * Get recovery suggestions for AxyncError and its subclasses
+   * Get recovery suggestions for AlphError and its subclasses
    */
-  private getAxyncErrorRecovery(error: AlphError): RecoverySuggestion[] {
+  private getAlphErrorRecovery(error: AlphError): RecoverySuggestion[] {
     const suggestions: RecoverySuggestion[] = [];
     
     // Handle PermissionError

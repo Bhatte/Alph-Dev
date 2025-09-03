@@ -253,9 +253,7 @@ export class FileOperations {
 
   // Internal helpers
   private static defaultTimeout(): number {
-    const v =
-      process.env['ALPH_IO_TIMEOUT_MS'] ||
-      process.env['AXYNC_IO_TIMEOUT_MS'];
+    const v = process.env['ALPH_IO_TIMEOUT_MS'];
     const n = v ? Number(v) : NaN;
     return Number.isFinite(n) && n > 0 ? n : 15000;
   }
@@ -276,9 +274,7 @@ export class FileOperations {
   }
 
   private static debug(msg: string) {
-    const flag =
-      process.env['ALPH_DEBUG'] ||
-      process.env['AXYNC_DEBUG'];
+    const flag = process.env['ALPH_DEBUG'];
     if (flag && /^(1|true|yes)$/i.test(flag)) {
       // eslint-disable-next-line no-console
       console.debug(`[FileOps ${new Date().toISOString()}] ${msg}`);

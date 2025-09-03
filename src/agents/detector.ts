@@ -92,15 +92,12 @@ export class AgentDetector {
   }
 
   /**
-   * Returns environment override variable names for an agent. Prefers ALPH_ prefix.
-   * Maintains backward compatibility with legacy environment variables.
+   * Returns environment override variable names for an agent.
    */
   private static getEnvOverrideVarNames(agent: 'cursor' | 'claude' | 'gemini'): string[] {
     const upper = agent.toUpperCase();
     return [
       `ALPH_${upper}_CONFIG`,
-      `AXYNC_${upper}_CONFIG`, // Backward compatibility
-      `AXYNC_${upper}_CONFIG_LEGACY`, // Backward compatibility
     ];
   }
 
@@ -154,29 +151,17 @@ export class AgentDetector {
   // Claude Code (not Claude Desktop)
   static getClaudeDefaultConfigPath(): string {
     const home = homedir();
-    // Main Claude.json has highest priority according to Claude Code docs
-    return resolve(join(home, '.claude', 'claude.json'));
+    // Claude Code uses .claude.json directly in the user's home directory
+    return resolve(join(home, '.claude.json'));
   }
 
   static getClaudeConfigPaths(): string[] {
     const home = homedir();
     const paths: string[] = [];
 
-    // Claude Code MCP configuration paths in priority order:
-    // 1. Main Claude.json (highest priority)
-    paths.push(join(home, '.claude', 'claude.json'));
-    
-    // 2. Config.json (commonly found)
-    paths.push(join(home, '.claude', 'config.json'));
-    
-    // 3. User-specific global settings
-    paths.push(join(home, '.claude', 'settings.json'));
-    
-    // 4. User-specific local settings  
-    paths.push(join(home, '.claude', 'settings.local.json'));
-    
-    // 5. Dedicated MCP file
-    paths.push(join(home, '.claude', 'mcp_servers.json'));
+    // Claude Code MCP configuration path:
+    // Uses .claude.json directly in the user's home directory
+    paths.push(join(home, '.claude.json'));
 
     return paths.map(p => resolve(p));
   }
@@ -225,7 +210,7 @@ export class AgentDetector {
           customPath = join(configDir, '.cursor', 'mcp.json');
           break;
         case 'claude':
-          customPath = join(configDir, '.claude', 'settings.local.json');
+          customPath = join(configDir, '.claude.json');
           break;
       }
       
@@ -256,7 +241,7 @@ export class AgentDetector {
           } else if (agent === 'cursor') {
             extra.push(join(root, '.config', 'Cursor', 'User', 'settings.json'));
           } else if (agent === 'claude') {
-            extra.push(join(root, '.config', 'claude', 'mcp.json'));
+            extra.push(join(root, '.claude.json'));
           }
         }
         candidates = [...extra.map(p => resolve(p)), ...candidates];

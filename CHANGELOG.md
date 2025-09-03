@@ -7,20 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-01-02
+
+### Fixed
+- Fixed Claude Code configuration detection to use correct paths instead of Claude Desktop paths
+- Resolved Claude Code MCP server detection and status reporting
+
 ### Changed
+- Enhanced logger with optional file logging capabilities:
+  - Added configurable file output with rotation support
+  - Added JSON logging format option
+  - Added async file operations with error handling
+  - Maintained backward compatibility with existing logger API
+- Consolidated duplicate `MCPServerConfig` type definitions
 - Documentation updated to reflect current CLI:
-  - Use `alph setup` (replacing references to `alph configure`).
-  - `status` command examples simplified (no `--output` flag).
-  - Installation docs use scoped package `@aqualia/alph-cli` and Node.js 18+.
-- CONTRIBUTING updated: Node 18+ required and pack/install instructions fixed.
+  - Use `alph setup` (replacing references to `alph configure`)
+  - `status` command examples simplified (no `--output` flag)
+  - Installation docs use scoped package `@aqualia/alph-cli` and Node.js 18+
+- CONTRIBUTING updated: Node 18+ required and pack/install instructions fixed
 
 ### Removed
-- `migrate` command has been removed from the CLI. The implementation now throws a clear error when referenced and is no longer registered in `src/commands/unified.ts`.
-- All migrate-related tests are skipped and will be removed in a future cleanup.
-- Documentation references to `migrate` removed from `README.md`, `USER_GUIDE.md`, and `ARCHITECTURE.md`.
+- Removed deprecated `migrate` command and all related files:
+  - `src/commands/migrate.ts`
+  - `tests/unit/commands/migrate.unit.test.ts` 
+  - `tests/integration/cli/migrate.integration.test.ts`
+- Removed duplicate `src/enhancedLogger.ts` (functionality integrated into main logger)
+- Documentation references to `migrate` removed from `README.md`, `USER_GUIDE.md`, and `ARCHITECTURE.md`
 
 ### Chore
-- Removed unused devDependencies (`@types/inquirer`, `@types/rimraf`).
+- Removed unused devDependencies (`@types/inquirer`, `@types/rimraf`)
+- Codebase cleanup: removed ~500 lines of dead code
+- Consolidated type definitions to eliminate duplication
 
 ## [0.1.14] - 2025-08-23
 

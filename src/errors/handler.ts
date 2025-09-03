@@ -56,20 +56,20 @@ export class ErrorHandler {
    * Handle an error and return a user-friendly message
    */
   handle(error: unknown): { message: string; details?: unknown } {
-    // Convert to AxyncError if it's not already
-    const axyncError = this.normalizeError(error);
+    // Convert to AlphError if it's not already
+    const alphError = this.normalizeError(error);
     
     // Log the error if enabled
     if (this.options.logErrors) {
-      this.logError(axyncError);
+      this.logError(alphError);
     }
     
     // Format the error for display
-    return this.formatError(axyncError);
+    return this.formatError(alphError);
   }
   
   /**
-   * Convert any error to an AxyncError
+   * Convert any error to an AlphError
    */
   private normalizeError(error: unknown): AlphError {
     if (isAlphError(error)) {

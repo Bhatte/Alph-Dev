@@ -39,7 +39,7 @@ export class ClaudeProvider implements AgentProvider {
    */
   protected getDefaultConfigPath(configDir?: string): string {
     if (configDir) {
-      return join(configDir, '.claude', 'settings.local.json');
+      return join(configDir, '.claude.json');
     }
     return AgentDetector.getDefaultConfigPath('claude');
   }
