@@ -148,17 +148,33 @@ export class AgentDetector {
     return envPath ? [envPath, ...base] : base;
   }
 
-  // Claude Code (primary path is ~/.claude.json, but support legacy/alt files)
+  // Claude Code default path is platform-specific:
+  // - Windows: ~/.claude/.claude.json (highest priority)
+  // - macOS/Linux: ~/.claude.json
   static getClaudeDefaultConfigPath(): string {
     const home = homedir();
+    if (platform() === 'win32') {
+      return resolve(join(home, '.claude', '.claude.json'));
+    }
     return resolve(join(home, '.claude.json'));
   }
 
   static getClaudeConfigPaths(): string[] {
     const home = homedir();
+    const isWindows = platform() === 'win32';
     const paths: string[] = [];
 
-    // Preferred new path
+    // Highest-priority default per platform
+    if (isWindows) {
+      // Windows: dedicated file under ~/.claude/.claude.json
+      paths.push(join(home, '.claude', '.claude.json'));
+    } else {
+      // macOS/Linux: top-level ~/.claude.json
+      paths.push(join(home, '.claude.json'));
+    }
+
+    // Also include the other platform's default so we can still read existing setups
+    // (e.g., if a user moved disks or synced config across OSes)
     paths.push(join(home, '.claude.json'));
 
     // Additional/legacy Claude paths observed in the wild
@@ -170,7 +186,15 @@ export class AgentDetector {
       join(home, '.claude', 'mcp_servers.json')
     );
 
-    return paths.map(p => resolve(p));
+    // Deduplicate while preserving order
+    const seen = new Set<string>();
+    const unique = paths.filter(p => {
+      const r = resolve(p);
+      if (seen.has(r)) return false;
+      seen.add(r);
+      return true;
+    });
+    return unique;
   }
 
   /**

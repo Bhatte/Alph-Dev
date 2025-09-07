@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- On Windows, prefer and write Claude Code config to `~/.claude/.claude.json` (highest priority); macOS/Linux continue to use `~/.claude.json`.
+
 ## [0.2.3] - 2025-01-02
 
 ### Fixed
