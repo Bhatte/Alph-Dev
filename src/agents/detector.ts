@@ -148,10 +148,9 @@ export class AgentDetector {
     return envPath ? [envPath, ...base] : base;
   }
 
-  // Claude Code (not Claude Desktop)
+  // Claude Code (primary path is ~/.claude.json, but support legacy/alt files)
   static getClaudeDefaultConfigPath(): string {
     const home = homedir();
-    // Claude Code uses .claude.json directly in the user's home directory
     return resolve(join(home, '.claude.json'));
   }
 
@@ -159,9 +158,17 @@ export class AgentDetector {
     const home = homedir();
     const paths: string[] = [];
 
-    // Claude Code MCP configuration path:
-    // Uses .claude.json directly in the user's home directory
+    // Preferred new path
     paths.push(join(home, '.claude.json'));
+
+    // Additional/legacy Claude paths observed in the wild
+    // Keep these for detection/status so we can read existing setups
+    paths.push(
+      join(home, '.claude', 'claude.json'),
+      join(home, '.claude', 'settings.json'),
+      join(home, '.claude', 'settings.local.json'),
+      join(home, '.claude', 'mcp_servers.json')
+    );
 
     return paths.map(p => resolve(p));
   }
@@ -210,7 +217,10 @@ export class AgentDetector {
           customPath = join(configDir, '.cursor', 'mcp.json');
           break;
         case 'claude':
-          customPath = join(configDir, '.claude.json');
+          // When a project dir is specified, prefer a project-local Claude file if present
+          // Check common project-local file first, then fallback to top-level .claude.json
+          customPath = join(configDir, '.claude', 'settings.local.json');
+          // If not present, detectActiveConfigPath will continue to scan candidates
           break;
       }
       
@@ -242,6 +252,7 @@ export class AgentDetector {
             extra.push(join(root, '.config', 'Cursor', 'User', 'settings.json'));
           } else if (agent === 'claude') {
             extra.push(join(root, '.claude.json'));
+            extra.push(join(root, '.claude', 'settings.local.json'));
           }
         }
         candidates = [...extra.map(p => resolve(p)), ...candidates];

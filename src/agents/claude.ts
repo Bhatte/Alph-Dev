@@ -9,14 +9,11 @@ import { AgentDetector } from './detector';
 
 /**
  * Claude Code provider for configuring Claude Code's MCP server settings
- * 
- * This provider handles detection and configuration of Claude Code,
- * which stores its MCP configuration in these locations (in priority order):
- * 1. ~/.claude/claude.json (Main Claude.json - highest priority)
- * 2. ~/.claude/settings.json (User-specific global)
- * 3. ~/.claude/settings.local.json (User-specific local)
- * 4. ~/.claude/mcp_servers.json (Dedicated MCP file)
- * 5. Project-specific: .claude/settings.local.json (in project directory)
+ *
+ * Primary config path: ~/.claude.json
+ * Also supports reading legacy/alternative paths (e.g., ~/.claude/claude.json,
+ * ~/.claude/settings.json, ~/.claude/settings.local.json, ~/.claude/mcp_servers.json,
+ * and project-local .claude/settings.local.json) for detection and status.
  */
 export class ClaudeProvider implements AgentProvider {
   public readonly name = 'Claude Code';
@@ -184,7 +181,9 @@ export class ClaudeProvider implements AgentProvider {
   async validate(): Promise<boolean> {
     try {
       if (!this.configPath) {
-        return false;
+        // Attempt to resolve an active path before giving up
+        this.configPath = await this.getActiveConfigPath(undefined);
+        if (!this.configPath) return false;
       }
 
       // Check if file exists and is readable
@@ -255,7 +254,10 @@ export class ClaudeProvider implements AgentProvider {
    */
   async listMCPServers(configDir?: string): Promise<string[]> {
     try {
-      const configPath = configDir ? this.getDefaultConfigPath(configDir) : this.configPath;
+      let configPath = configDir ? this.getDefaultConfigPath(configDir) : this.configPath;
+      if (!configPath) {
+        configPath = await this.getActiveConfigPath(configDir) || undefined as any;
+      }
       
       if (!configPath || !(await FileOperations.fileExists(configPath))) {
         return [];

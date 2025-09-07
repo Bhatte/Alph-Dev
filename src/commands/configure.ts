@@ -116,7 +116,8 @@ export class ConfigureCommand {
       await startInteractiveConfig({
         mcpServerEndpoint: this.options.mcpServerEndpoint,
         transport: this.options.transport,
-        mcpAccessKey: this.options.bearer || undefined,
+        // Pass bearer correctly so the wizard can reuse it
+        bearer: this.options.bearer || undefined,
         agents: this.options.agents as any,
       } as any);
       return;
@@ -139,8 +140,14 @@ export class ConfigureCommand {
     const detectionResults = await defaultRegistry.detectAvailableAgents(providerFilter, this.options.configDir);
     const detectedProviders = defaultRegistry.getDetectedProviders(detectionResults);
     if (detectedProviders.length === 0) {
-      this.handleNoAgentsDetected();
-      return;
+      // Fallback: if the user explicitly requested agents, proceed to configure them
+      // even if no existing config files were detected. Providers will create files.
+      if (valid.length > 0) {
+        console.log('\nℹ️  No existing configuration files detected; will create new ones for requested agents.');
+      } else {
+        this.handleNoAgentsDetected();
+        return;
+      }
     }
 
     // 2) Build MCP server configuration
@@ -315,19 +322,25 @@ export class ConfigureCommand {
     detectionResults: any
   ): Promise<void> {
     const detectedProviders = defaultRegistry.getDetectedProviders(detectionResults);
-    
-    // CRITICAL FIX: Filter providers based on user's agent selection
+
+    // Filter providers based on user's agent selection. If none detected,
+    // fallback to registered providers matching the request so we can create files.
     let selectedProviders = detectedProviders;
     if (this.options.agents && typeof this.options.agents === 'string' && this.options.agents.trim()) {
       const requestedAgents = mapAliases(parseAgentNames(this.options.agents));
-      selectedProviders = detectedProviders.filter(provider => 
-        requestedAgents.includes(provider.name)
-      );
+      selectedProviders = detectedProviders.filter(provider => requestedAgents.includes(provider.name));
+      if (selectedProviders.length === 0) {
+        // Fallback: use registered providers matching the request
+        const all = defaultRegistry.getAllProviders();
+        selectedProviders = all.filter(p => requestedAgents.includes(p.name));
+      }
       
       if (selectedProviders.length === 0) {
         console.log(`\n⚠️  None of the requested agents (${requestedAgents.join(', ')}) were detected.`);
-        console.log('Detected agents:', detectedProviders.map(p => p.name).join(', '));
-        return;
+        if (detectedProviders.length > 0) {
+          console.log('Detected agents:', detectedProviders.map(p => p.name).join(', '));
+        }
+        console.log('Proceeding to create new configuration files for requested agents.');
       }
     }
     
