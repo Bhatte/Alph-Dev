@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- On Windows, prefer and write Claude Code config to `~/.claude/.claude.json` (highest priority); macOS/Linux continue to use `~/.claude.json`.
+- Claude Code: use `~/.claude.json` on all platforms; add project-scoped MCP servers under `projects[<abs path>].mcpServers` so servers are active per project; adjust list/has to honor project scope.
 
 ## [0.2.3] - 2025-01-02
 

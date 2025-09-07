@@ -186,7 +186,38 @@ export interface ClaudeConfig {
     };
   };
   
+  /** Per-project configuration map keyed by absolute project path */
+  projects?: {
+    [projectPath: string]: ClaudeProjectConfig;
+  };
+  
   /** Other Claude-specific settings (preserved during modification) */
+  [key: string]: unknown;
+}
+
+/**
+ * Claude per-project configuration structure.
+ * Minimal shape to support MCP server activation within a specific project.
+ */
+export interface ClaudeProjectConfig {
+  /** Project-specific MCP server configurations */
+  mcpServers?: {
+    [serverName: string]: {
+      command?: string;
+      args?: string[];
+      env?: Record<string, string>;
+      url?: string;
+      headers?: Record<string, string>;
+      transport?: 'http' | 'sse' | 'stdio';
+      disabled?: boolean;
+    };
+  };
+
+  /** Enabled/disabled .mcp.json file references (kept for compatibility) */
+  enabledMcpjsonServers?: string[];
+  disabledMcpjsonServers?: string[];
+
+  /** Additional fields we don't model explicitly should be preserved */
   [key: string]: unknown;
 }
 
@@ -285,4 +316,3 @@ export interface ConfigModificationContext {
   /** Backup information if a backup was created */
   backup?: BackupInfo;
 }
-

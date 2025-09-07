@@ -1,4 +1,4 @@
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { AgentProvider, AgentConfig, RemovalConfig } from './provider';
 import { ClaudeConfig } from '../types/config';
 import { BackupInfo } from '../utils/backup';
@@ -34,10 +34,10 @@ export class ClaudeProvider implements AgentProvider {
    * @param configDir - Optional custom configuration directory
    * @returns Default path to Claude configuration file
    */
-  protected getDefaultConfigPath(configDir?: string): string {
-    if (configDir) {
-      return join(configDir, '.claude.json');
-    }
+  protected getDefaultConfigPath(_configDir?: string): string {
+    // Claude Code always stores configuration in the user's home directory
+    // under ~/.claude.json. The optional configDir (project) is used only
+    // to decide which project entry to update, not where the file lives.
     return AgentDetector.getDefaultConfigPath('claude');
   }
 
@@ -56,23 +56,8 @@ export class ClaudeProvider implements AgentProvider {
    * @returns Promise resolving to the configuration file path if detected, null if not found
    * @throws Error if detection fails due to permission or system issues
    */
-  async detect(configDir?: string): Promise<string | null> {
+  async detect(_configDir?: string): Promise<string | null> {
     try {
-      // If custom config directory is provided, check it first
-      if (configDir) {
-        const customPath = this.getDefaultConfigPath(configDir);
-        try {
-          if (await FileOperations.fileExists(customPath) && await FileOperations.isReadable(customPath)) {
-            // Validate it is JSON
-            await FileOperations.readJsonFile<unknown>(customPath);
-            this.configPath = customPath;
-            return customPath;
-          }
-        } catch (err) {
-          // If custom path is invalid, continue with normal detection
-        }
-      }
-      
       const possiblePaths = this.getAlternativeConfigPaths();
       // If any candidate exists but is not readable, throw (tests expect this behavior)
       for (const p of possiblePaths) {
@@ -127,10 +112,10 @@ export class ClaudeProvider implements AgentProvider {
   async configure(config: AgentConfig, backup: boolean = true): Promise<string | undefined> {
     // Ensure we have a valid configuration path
     if (!this.configPath) {
-      const detectedPath = await this.detect(config.configDir);
+      const detectedPath = await this.detect(undefined);
       if (!detectedPath) {
         // Create new configuration file if it doesn't exist
-        this.configPath = this.getDefaultConfigPath(config.configDir);
+        this.configPath = this.getDefaultConfigPath(undefined);
       }
     }
 
@@ -142,12 +127,19 @@ export class ClaudeProvider implements AgentProvider {
       // Ensure the directory exists before attempting to write
       await FileOperations.ensureDirectory(dirname(this.configPath));
       
+      // Default project to current working directory when none is provided,
+      // so the MCP server becomes active for this project in Claude Code.
+      const configForProject = {
+        ...config,
+        configDir: (config.configDir && config.configDir.trim()) ? config.configDir : process.cwd()
+      };
+
       // Use safe edit manager to perform the configuration update
       const result = await SafeEditManager.safeEdit<ClaudeConfig>(
         this.configPath,
-        (claudeConfig) => this.injectMCPServerConfig(claudeConfig, config),
+        (claudeConfig) => this.injectMCPServerConfig(claudeConfig, configForProject),
         {
-          validator: (modifiedConfig) => this.validateClaudeConfig(modifiedConfig, config),
+          validator: (modifiedConfig) => this.validateClaudeConfig(modifiedConfig, configForProject),
           createBackup: backup,
           autoRollback: true
         }
@@ -254,9 +246,9 @@ export class ClaudeProvider implements AgentProvider {
    */
   async listMCPServers(configDir?: string): Promise<string[]> {
     try {
-      let configPath = configDir ? this.getDefaultConfigPath(configDir) : this.configPath;
+      let configPath = this.configPath;
       if (!configPath) {
-        configPath = await this.getActiveConfigPath(configDir) || undefined as any;
+        configPath = await this.getActiveConfigPath(undefined) || undefined as any;
       }
       
       if (!configPath || !(await FileOperations.fileExists(configPath))) {
@@ -264,12 +256,19 @@ export class ClaudeProvider implements AgentProvider {
       }
 
       const config = await FileOperations.readJsonFile<ClaudeConfig>(configPath);
-      
-      if (!config.mcpServers || typeof config.mcpServers !== 'object') {
-        return [];
+      // If a configDir (project path) was specified, prefer project-level servers
+      if (configDir && configDir.trim()) {
+        const projectPath = resolve(configDir.trim());
+        const proj = (config.projects && (config.projects as any)[projectPath]) as any;
+        if (proj && proj.mcpServers && typeof proj.mcpServers === 'object') {
+          return Object.keys(proj.mcpServers);
+        }
       }
-
-      return Object.keys(config.mcpServers);
+      // Fallback to global servers
+      if (config.mcpServers && typeof config.mcpServers === 'object') {
+        return Object.keys(config.mcpServers);
+      }
+      return [];
     } catch (error) {
       throw new Error(`Failed to list MCP servers from Claude Code: ${error}`);
     }
@@ -393,8 +392,24 @@ export class ClaudeProvider implements AgentProvider {
     // Set disabled state
     serverConfig.disabled = false;
 
-    // Inject the server configuration
+    // Inject the server configuration (global)
     modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
+
+    // Also inject into project-specific scope when a project directory is provided
+    // Claude Code expects per-project servers under projects[absolutePath].mcpServers
+    if (config.configDir && config.configDir.trim()) {
+      const projectPath = resolve(config.configDir.trim());
+      if (!modifiedConfig.projects || typeof modifiedConfig.projects !== 'object') {
+        modifiedConfig.projects = {} as any;
+      }
+      const existingProject = (modifiedConfig.projects as any)[projectPath] as any || {};
+      const projectConfig: any = { ...existingProject };
+      if (!projectConfig.mcpServers || typeof projectConfig.mcpServers !== 'object') {
+        projectConfig.mcpServers = {};
+      }
+      projectConfig.mcpServers[config.mcpServerId] = { ...serverConfig };
+      (modifiedConfig.projects as any)[projectPath] = projectConfig;
+    }
 
     return modifiedConfig;
   }
@@ -420,9 +435,20 @@ export class ClaudeProvider implements AgentProvider {
       throw new Error(`MCP server '${config.mcpServerId}' not found`);
     }
 
-    // Create a new mcpServers object without the specified server
+    // Create a new mcpServers object without the specified server (global)
     const { [config.mcpServerId]: removedServer, ...remainingServers } = modifiedConfig.mcpServers;
     modifiedConfig.mcpServers = remainingServers;
+
+    // Also remove from project-specific scope if a project directory was provided
+    if (config.configDir && config.configDir.trim() && modifiedConfig.projects && typeof modifiedConfig.projects === 'object') {
+      const projectPath = resolve(config.configDir.trim());
+      const proj: any = (modifiedConfig.projects as any)[projectPath];
+      if (proj && proj.mcpServers && typeof proj.mcpServers === 'object') {
+        const { [config.mcpServerId]: _pRemoved, ...pRemaining } = proj.mcpServers as any;
+        proj.mcpServers = pRemaining;
+        (modifiedConfig.projects as any)[projectPath] = proj;
+      }
+    }
 
     return modifiedConfig;
   }
@@ -438,6 +464,29 @@ export class ClaudeProvider implements AgentProvider {
       // Basic structure validation
       if (typeof config !== 'object' || config === null) {
         return false;
+      }
+
+      // If projects exists, perform light validation of project-level structures
+      if (config.projects) {
+        if (typeof config.projects !== 'object') return false;
+        for (const [, proj] of Object.entries(config.projects)) {
+          if (proj && typeof proj === 'object' && 'mcpServers' in proj) {
+            const ps: any = (proj as any).mcpServers;
+            if (ps && typeof ps !== 'object') return false;
+            if (ps) {
+              for (const [, pServer] of Object.entries(ps)) {
+                if (typeof pServer !== 'object' || pServer === null) return false;
+                if (pServer.command && typeof pServer.command !== 'string') return false;
+                if (pServer.args && !Array.isArray(pServer.args)) return false;
+                if (pServer.env && typeof pServer.env !== 'object') return false;
+                if (pServer.url && typeof pServer.url !== 'string') return false;
+                if (pServer.headers && typeof pServer.headers !== 'object') return false;
+                if (pServer.transport && !['http', 'sse', 'stdio'].includes(pServer.transport)) return false;
+                if (pServer.disabled !== undefined && typeof pServer.disabled !== 'boolean') return false;
+              }
+            }
+          }
+        }
       }
 
       // If mcpServers exists, validate its structure

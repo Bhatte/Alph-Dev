@@ -95,6 +95,17 @@ alph setup --mcp-server-endpoint https://askhuman.net/mcp/server-id --bearer you
 # Filtered agents
 alph setup --mcp-server-endpoint https://askhuman.net/mcp/server-id --agents gemini,cursor
 
+# Claude Code: activate for current project (defaults to cwd)
+alph setup --agents claude \
+  --mcp-server-endpoint https://askhuman.net/mcp/your-server-id \
+  --bearer your-token
+
+# Claude Code: activate for a specific project directory
+alph setup --agents claude \
+  --dir "/absolute/path/to/your/project" \
+  --mcp-server-endpoint https://askhuman.net/mcp/your-server-id \
+  --bearer your-token
+
 # Status
 alph status
 
@@ -138,6 +149,10 @@ alph setup \
   --mcp-server-endpoint https://askhuman.net/mcp/your-server-id \
   --agents gemini,cursor \
   --name my-config-name
+
+Note on `--dir` semantics:
+- For Claude Code, `--dir` is treated as the project directory whose absolute path is used under `~/.claude.json` → `projects[<abs path>].mcpServers`. If omitted, Alph uses the current working directory by default so the server is active in your current project.
+- For other agents, `--dir` may be used for testing or sandboxed setups and does not affect global agent locations unless explicitly supported by that agent’s provider.
 ```
 
 ### Server Management
