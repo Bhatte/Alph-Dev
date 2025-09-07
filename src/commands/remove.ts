@@ -251,7 +251,6 @@ export class RemoveCommand {
     console.log('  • Gemini CLI: ~/.gemini/settings.json');
     console.log('  • Cursor: Platform-specific configuration');
     console.log('  • Claude Code: Platform-specific configuration');
-    console.log('  • VS Code: Platform-specific configuration');
     console.log('\nPlease install at least one supported AI agent and try again.');
   }
   

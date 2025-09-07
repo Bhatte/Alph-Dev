@@ -10,9 +10,7 @@ const ALIASES: Record<string, string> = {
   cursor: 'Cursor',
   claude: 'Claude Code',
   claudecode: 'Claude Code',
-  'claude-code': 'Claude Code',
-  vscode: 'VS Code',
-  'vs-code': 'VS Code'
+  'claude-code': 'Claude Code'
 };
 
 export function parseAgentNames(agentList?: string | string[]): string[] {

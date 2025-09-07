@@ -10,7 +10,6 @@ import { AgentProvider, AgentConfig, ProviderDetectionResult, ProviderConfigurat
 import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
-import { VSCodeProvider } from './vscode';
 
 /**
  * Configuration options for the agent registry
@@ -86,7 +85,6 @@ export class AgentRegistry {
     this.registerProvider(new GeminiProvider());
     this.registerProvider(new CursorProvider());
     this.registerProvider(new ClaudeProvider());
-    this.registerProvider(new VSCodeProvider());
   }
 
   /**
@@ -942,8 +940,7 @@ export function createRegistryWithProviders(providerNames: string[]): AgentRegis
   const providerMap: Record<string, () => AgentProvider> = {
     'Gemini CLI': () => new GeminiProvider(),
     'Cursor': () => new CursorProvider(),
-    'Claude Code': () => new ClaudeProvider(),
-    'VS Code': () => new VSCodeProvider()
+    'Claude Code': () => new ClaudeProvider()
   };
 
   // Register requested providers

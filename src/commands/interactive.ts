@@ -156,7 +156,6 @@ export class InteractiveConfigurator {
       'gemini': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
       'cursor': 'Cursor IDE — AI‑powered code editor with inline assistance and automations',
       'claude': 'Claude Code — Anthropic’s coding assistant for generating, explaining, and refactoring code',
-      'vscode': 'Visual Studio Code - Popular code editor with AI extension support',
       'generic': 'Custom AI agent - Flexible configuration for any MCP-compatible tool',
       'default': 'AI agent with MCP server integration support'
     };

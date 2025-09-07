@@ -153,7 +153,7 @@ export class DefaultConfigGenerator implements ConfigGenerator {
       
       default:
         // Validate agent type
-        if (agentType !== 'gemini' && agentType !== 'cursor' && agentType !== 'claude' && agentType !== 'vscode' && agentType !== 'generic') {
+        if (agentType !== 'gemini' && agentType !== 'cursor' && agentType !== 'claude' && agentType !== 'generic') {
           throw new Error(`Unsupported agent type: ${agentType}`);
         }
         break;
