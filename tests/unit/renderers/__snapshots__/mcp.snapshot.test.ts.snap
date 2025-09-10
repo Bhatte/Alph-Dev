@@ -1,0 +1,197 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Protocol-aware rendering snapshots Claude HTTP 1`] = `
+{
+  "mcpServers": {
+    "notion": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Claude SSE 1`] = `
+{
+  "mcpServers": {
+    "linear": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "type": "sse",
+      "url": "https://mcp.linear.app/sse",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Claude STDIO 1`] = `
+{
+  "mcpServers": {
+    "local": {
+      "args": [
+        "mcp",
+        "serve",
+      ],
+      "command": "claude",
+      "env": {
+        "FOO": "bar",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Cursor HTTP 1`] = `
+{
+  "mcpServers": {
+    "notion": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "url": "https://mcp.notion.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Cursor SSE 1`] = `
+{
+  "mcpServers": {
+    "linear": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "type": "sse",
+      "url": "https://mcp.linear.app/sse",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Cursor STDIO 1`] = `
+{
+  "mcpServers": {
+    "github": {
+      "args": [
+        "-y",
+        "@mcp/github",
+      ],
+      "command": "npx",
+      "env": {
+        "FOO": "bar",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Gemini HTTP 1`] = `
+{
+  "mcpServers": {
+    "notion": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "httpUrl": "https://mcp.notion.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Gemini SSE 1`] = `
+{
+  "mcpServers": {
+    "linear": {
+      "env": {
+        "FOO": "bar",
+      },
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "transport": "sse",
+      "url": "https://mcp.linear.app/sse",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Gemini STDIO 1`] = `
+{
+  "mcpServers": {
+    "github": {
+      "args": [],
+      "command": "github-mcp",
+      "env": {
+        "FOO": "bar",
+      },
+      "timeout": 5000,
+      "transport": "stdio",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Warp HTTP 1`] = `
+{
+  "mcpServers": {
+    "remote": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "serverUrl": "https://api.example.com/mcp",
+      "url": "https://api.example.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Warp STDIO 1`] = `
+{
+  "mcpServers": {
+    "local": {
+      "args": [
+        "-y",
+        "@mcp/local",
+      ],
+      "command": "npx",
+      "env": {
+        "FOO": "bar",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Windsurf HTTP 1`] = `
+{
+  "mcpServers": {
+    "remote": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "serverUrl": "https://api.example.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Windsurf STDIO 1`] = `
+{
+  "mcpServers": {
+    "local": {
+      "args": [
+        "-y",
+        "@mcp/local",
+      ],
+      "command": "npx",
+      "env": {
+        "FOO": "bar",
+      },
+    },
+  },
+}
+`;

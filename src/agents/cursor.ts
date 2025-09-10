@@ -6,6 +6,7 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
 
 /**
  * Cursor IDE provider for configuring Cursor's MCP server settings
@@ -36,10 +37,10 @@ export class CursorProvider implements AgentProvider {
    * @returns Default path to Cursor settings.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
-    if (configDir) {
-      return join(configDir, '.cursor', 'mcp.json');
+    if (configDir && configDir.trim()) {
+      return resolveConfigPath('cursor', 'project', configDir) || join(configDir, '.cursor', 'mcp.json');
     }
-    return AgentDetector.getDefaultConfigPath('cursor');
+    return resolveConfigPath('cursor', 'user') || AgentDetector.getDefaultConfigPath('cursor');
   }
 
   /**
@@ -59,7 +60,7 @@ export class CursorProvider implements AgentProvider {
    */
   private isLegacySettingsPath(p: string | null | undefined): boolean {
     if (!p) return false;
-    return /(^|[\/\\])settings\.json$/i.test(p);
+    return /(^|[/\\])settings\.json$/i.test(p);
   }
 
   /**
@@ -392,7 +393,7 @@ export class CursorProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Cursor configuration
    */
-  private injectMCPServerConfig(cursorConfig: CursorConfig, config: AgentConfig): CursorConfig {
+  private async injectMCPServerConfig(cursorConfig: CursorConfig, config: AgentConfig): Promise<CursorConfig> {
     // Create a copy of the configuration to avoid mutations
     const modifiedConfig: CursorConfig = { ...cursorConfig };
 
@@ -401,38 +402,21 @@ export class CursorProvider implements AgentProvider {
       modifiedConfig.mcpServers = {};
     }
 
-    // Build server configuration based on transport
-    const transport = config.transport || 'http';
-    let serverConfig: Exclude<CursorConfig['mcpServers'], undefined>[string];
-
-    if (transport === 'stdio') {
-      // stdio transport: use command/args/env; no URL/headers
-      serverConfig = {
-        ...(config.command ? { command: config.command } : {}),
-        ...(config.args ? { args: config.args } : {}),
-        ...(config.env ? { env: config.env } : {}),
-        transport,
-        disabled: false,
-        autoApprove: []
-      };
-    } else {
-      // http/sse transport: include url and headers, optional env
-      serverConfig = {
-        ...(config.mcpServerUrl !== undefined ? { url: config.mcpServerUrl } : {}),
-        headers: {
-          'Content-Type': 'application/json',
-          ...(config.mcpAccessKey ? { Authorization: `Bearer ${config.mcpAccessKey}` } : {}),
-          ...(config.headers || {})
-        },
-        transport,
-        disabled: false,
-        autoApprove: [],
-        ...(config.env ? { env: config.env } : {})
-      };
-    }
-
-    // Inject the server configuration
-    modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
+    // Render protocol-aware shape and inject
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'cursor',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      env: config.env
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverEntry = (rendered as any)['mcpServers'][config.mcpServerId];
+    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as any;
 
     return modifiedConfig;
   }
@@ -550,9 +534,13 @@ export class CursorProvider implements AgentProvider {
                 serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
               return false;
             }
-            if (expectedMCPConfig.transport && serverConfig.transport !== expectedMCPConfig.transport) {
-              return false;
-            }
+          // Determine effective transport: prefer explicit transport, then 'type', then infer
+          const effectiveTransport = (serverConfig.transport as any)
+            || ((serverConfig as any).type as any)
+            || (serverConfig.command ? 'stdio' : (serverConfig.httpUrl || serverConfig.url ? 'http' : undefined));
+          if (expectedMCPConfig.transport && effectiveTransport !== expectedMCPConfig.transport) {
+            return false;
+          }
           }
         }
       }

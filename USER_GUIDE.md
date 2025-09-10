@@ -15,7 +15,7 @@ Welcome to the official user guide for `alph`, the universal MCP (Model Context 
 
 ## ✨ Introduction
 
-`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, and Claude Code. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
+`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, Claude Code — and now Windsurf, Warp, and Codex CLI. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
 
 ## 💾 Installation
 
@@ -54,6 +54,8 @@ alph remove [options]
 
 ## Command Reference
 
+## Command Reference
+
 ```text
 alph setup [options]
       --mcp-server-endpoint <url>   MCP server endpoint URL
@@ -65,6 +67,9 @@ alph setup [options]
       --env <list>                  Environment variables (key=value pairs)
       --headers <list>              HTTP headers (key=value pairs)
       --timeout <ms>                Command execution timeout in milliseconds
+      --install-manager <mgr>       Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)
+      --atomic-mode <mode>          Atomic write strategy (auto|copy|rename)
+      --no-install                  Do not auto-install missing STDIO tools (opt-out)
       --agents <list>               Comma-separated agent names
       --dir <path>                  Custom config directory
       --dry-run                     Preview changes without writing
@@ -123,7 +128,88 @@ alph remove --server-name your-server-name --dry-run
 
 # Remove server without creating a backup (use with caution)
 alph remove --server-name your-server-name --no-backup -y
+
+### Codex: Remote MCP via Local Proxy
+
+Codex CLI supports STDIO only. Alph bridges remote MCP via a local Supergateway proxy:
+
+- Preferred transport: Streamable HTTP; SSE supported for compatibility.
+- Default pin: `supergateway@3.4.0` (override with `ALPH_PROXY_VERSION` or `alph proxy run --proxy-version`).
+
+Examples
+
+```bash
+# HTTP (Streamable) via local proxy
+alph setup --agents Codex \
+  --proxy-transport http \
+  --proxy-remote-url https://mcp.example.com/mcp \
+  --yes
+
+# SSE via local proxy
+alph setup --agents Codex \
+  --proxy-transport sse \
+  --proxy-remote-url https://mcp.example.com/sse \
+  --yes
+
+# Pin override for health preview
+ALPH_PROXY_VERSION=3.2.0 alph proxy health --remote-url https://mcp.example.com/mcp --transport http
 ```
+
+Notes
+
+- Windows first-run is pre‑warmed (`npx -y supergateway --help`).
+- Codex entries with generic runners get `startup_timeout_ms = 60000` unless you set a custom value.
+- Previews and logs redact tokens and sensitive headers.
+
+## STDIO Local Tools (Default-Enabled)
+
+When selecting STDIO transport, Alph will:
+- Detect the selected local MCP tool; if missing, install it by default (echoing commands)
+- Run health checks (e.g., `--version`, `--help`) and abort if they fail
+- Proceed to write config only after health success
+
+Flags and env:
+- `--no-install` or `ALPH_NO_INSTALL=1` to skip automatic install
+- `--install-manager <npm|brew|pipx|cargo|auto>` to prefer an installer (env: `ALPH_INSTALL_MANAGER`)
+- `--atomic-mode <auto|copy|rename>` to influence atomic I/O (env: `ALPH_ATOMIC_MODE`)
+
+## Protocol Shapes (Rendered)
+
+Cursor
+- STDIO: command/args/env
+- SSE: `type: "sse"`, `url`, `headers`
+- HTTP: `type: "http"`, `url`, `headers`
+
+Gemini
+- STDIO: `transport: "stdio"`, `command`, `args?`, `cwd?`, `env?`, `timeout?`
+- SSE: `transport: "sse"`, `url`, `headers?`, `env?`, `timeout?`
+- HTTP: `httpUrl`, `headers?`, `env?`, `timeout?`
+
+Windsurf
+- STDIO: `command`, `args?`, `env?`
+- HTTP/SSE: `serverUrl`, `headers?`, `env?`
+
+Warp
+- STDIO: `command`, `args?`, `env?`
+- Remote: `url` (and `serverUrl` for compatibility), `headers?`
+```
+
+Codex CLI
+- Transport: STDIO only (no HTTP/SSE endpoint configuration)
+- Config file: `~/.codex/config.toml` (TOML)
+- Shape:
+```
+[mcp_servers.<name>]
+command = "<executable>"
+args    = ["<arg1>", "<arg2>"]
+startup_timeout_ms = 20000  # optional
+```
+Notes:
+- Codex currently reads MCP servers from `mcp_servers` in TOML and launches processes via STDIO only.
+- Alph's wizard automatically limits transport to STDIO when Codex is selected and skips remote URL prompts.
+ - First-run of generic runners like `npx`/`yarn dlx`/`pnpm dlx` can take longer than Codex’s default 10s timeout due to dependency download. Alph now:
+   - Pre‑warms these invocations during interactive setup (runs `--help` once to cache).
+   - Sets a safer default `startup_timeout_ms = 60000` for such commands unless you specify a custom timeout.
 
 ## Common Use Cases
 
@@ -207,3 +293,4 @@ If you run into issues with `alph`:
 *   **Permissions:** Verify write access to configuration directories.
 *   **Async.link endpoint:** Confirm the server ID is valid and reachable.
 *   **Open an issue:** https://github.com/Aqualia/Alph/issues
+

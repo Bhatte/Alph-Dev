@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { AgentProvider, AgentConfig, RemovalConfig } from './provider';
 import { ClaudeConfig } from '../types/config';
 import { BackupInfo } from '../utils/backup';
@@ -6,6 +6,7 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
 
 /**
  * Claude Code provider for configuring Claude Code's MCP server settings
@@ -35,10 +36,8 @@ export class ClaudeProvider implements AgentProvider {
    * @returns Default path to Claude configuration file
    */
   protected getDefaultConfigPath(_configDir?: string): string {
-    // Claude Code always stores configuration in the user's home directory
-    // under ~/.claude.json. The optional configDir (project) is used only
-    // to decide which project entry to update, not where the file lives.
-    return AgentDetector.getDefaultConfigPath('claude');
+    // Prefer catalog-derived user path; fallback to detector default
+    return resolveConfigPath('claude', 'user') || AgentDetector.getDefaultConfigPath('claude');
   }
 
   /**
@@ -344,7 +343,7 @@ export class ClaudeProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Claude Code configuration
    */
-  private injectMCPServerConfig(claudeConfig: ClaudeConfig, config: AgentConfig): ClaudeConfig {
+  private async injectMCPServerConfig(claudeConfig: ClaudeConfig, config: AgentConfig): Promise<ClaudeConfig> {
     // Create a copy of the configuration to avoid mutations
     const modifiedConfig: ClaudeConfig = { ...claudeConfig };
 
@@ -353,44 +352,20 @@ export class ClaudeProvider implements AgentProvider {
       modifiedConfig.mcpServers = {};
     }
 
-    // Create the MCP server configuration for Claude Code format
-    const serverConfig: Exclude<ClaudeConfig['mcpServers'], undefined>[string] = {};
-
-    // Handle different transport types
-    if (config.transport === 'stdio' || config.command) {
-      // Command-based MCP server
-      if (config.command) {
-        serverConfig.command = config.command;
-      }
-      if (config.args && config.args.length > 0) {
-        serverConfig.args = config.args;
-      }
-      if (config.env && Object.keys(config.env).length > 0) {
-        serverConfig.env = config.env;
-      }
-    } else {
-      // HTTP-based MCP server
-      if (config.mcpServerUrl) {
-        serverConfig.url = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        serverConfig.headers = config.headers;
-      }
-      if (config.mcpAccessKey) {
-        if (!serverConfig.headers) {
-          serverConfig.headers = {};
-        }
-        serverConfig.headers['Authorization'] = `Bearer ${config.mcpAccessKey}`;
-      }
-    }
-
-    // Set transport if specified
-    if (config.transport) {
-      serverConfig.transport = config.transport;
-    }
-
-    // Set disabled state
-    serverConfig.disabled = false;
+    // Render protocol-aware shape
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'claude',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      env: config.env
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverConfig = (rendered as any)['mcpServers'][config.mcpServerId] as any;
 
     // Inject the server configuration (global)
     modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
@@ -469,12 +444,14 @@ export class ClaudeProvider implements AgentProvider {
       // If projects exists, perform light validation of project-level structures
       if (config.projects) {
         if (typeof config.projects !== 'object') return false;
-        for (const [, proj] of Object.entries(config.projects)) {
+        for (const [, projRaw] of Object.entries(config.projects as Record<string, any>)) {
+          const proj = projRaw as any;
           if (proj && typeof proj === 'object' && 'mcpServers' in proj) {
-            const ps: any = (proj as any).mcpServers;
+            const ps = proj.mcpServers as any;
             if (ps && typeof ps !== 'object') return false;
             if (ps) {
-              for (const [, pServer] of Object.entries(ps)) {
+              for (const [, pServerRaw] of Object.entries(ps as Record<string, any>)) {
+                const pServer = pServerRaw as any;
                 if (typeof pServer !== 'object' || pServer === null) return false;
                 if (pServer.command && typeof pServer.command !== 'string') return false;
                 if (pServer.args && !Array.isArray(pServer.args)) return false;
@@ -553,8 +530,11 @@ export class ClaudeProvider implements AgentProvider {
             }
           }
 
-          // Validate transport if specified
-          if (expectedMCPConfig.transport && serverConfig.transport !== expectedMCPConfig.transport) {
+          // Validate transport if specified (accept either 'transport' or 'type')
+          const effectiveTransport = (serverConfig.transport as any)
+            || ((serverConfig as any).type as any)
+            || (serverConfig.command ? 'stdio' : (serverConfig.url ? 'http' : undefined));
+          if (expectedMCPConfig.transport && effectiveTransport !== expectedMCPConfig.transport) {
             return false;
           }
         }

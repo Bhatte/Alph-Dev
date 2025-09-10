@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-09-10
+
+### Added
+- 30-second try path: `npx @aqualia/alph-cli@latest` for instant usage without global install.
+- Global `--verbose` flag to enable additional debug output.
+
+### Changed
+- UI output centralized through a new `ui` utility (`src/utils/ui.ts`) for consistent formatting and future verbosity control.
+- Improved banner colors (brighter red/orange using 256-color ANSI) for a cleaner, modern look.
+- Status command output retained the enhanced formatting with clear sections and ANSI emphasis.
+
+### Removed
+- Replaced `chalk` (ESM-only) with `yoctocolors-cjs` to avoid ESM/CJS friction and simplify color usage across the CLI.
+
+### Docs
+- README: neutralized vendor-specific endpoints, added a "Try in 30 seconds" block, and documented compatibility.
+- Moved protocol examples into `docs/agents/protocol-examples.md`.
+- Started Docs IA tidy: internal-facing documents relocated under `docs/internal/`.
+
+### Added
+- Local MCP proxy integration for Codex via Supergateway (STDIO ↔ Streamable HTTP/SSE).
+- New `alph proxy` commands: `run` and `health`.
+- Proxy version pinning (default `supergateway@3.4.0`), override via `--proxy-version` or `ALPH_PROXY_VERSION`.
+- Non-interactive proxy flags in `alph setup`: `--proxy-remote-url`, `--proxy-transport`, `--proxy-bearer`, `--proxy-header`.
+- Pre-warm step for Windows (`npx -y supergateway --help`) and 60s startup heuristic for `npx`.
+- Redaction improvements across previews and logs.
+- Health checks and lightweight HTTP/SSE mocks for tests.
+- Optional telemetry (disabled by default) with minimal, non-PII counters.
+
+### Docs
+- User Guide: proxy usage examples, pinning policy, Windows guidance.
+- Troubleshooting: transport mismatch, pin override, rollback.
+- ADR-001: decision to adopt Supergateway and prefer Streamable HTTP.
+
+
 ### Fixed
 - Claude Code: use `~/.claude.json` on all platforms; add project-scoped MCP servers under `projects[<abs path>].mcpServers` so servers are active per project; adjust list/has to honor project scope.
 

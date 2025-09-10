@@ -1,4 +1,4 @@
-<p align="center">
+ <p align="center">
   <img src="assets/alph-banner.svg" alt="ALPH banner" width="720" />
 </p>
 
@@ -35,13 +35,25 @@ Alph CLI automates safe, repeatable MCP configuration across agents. It detects 
 - **Gemini CLI** (`~/.gemini/settings.json`)
 - **Cursor** (platform-specific configuration locations)
 - **Claude Code** (Claude-specific configuration format)
-- **Generic Provider** (custom configuration files)
+- **Windsurf** (IDE-specific configuration)
+- **Warp** (terminal configuration)
+- **Codex CLI** (TOML-based configuration)
+
+See detailed guides in [docs/agents](./docs/agents/README.md).
 
 ## Installation
 
 ```bash
 npm install -g @aqualia/alph-cli
 ```
+
+### Try in 30 seconds
+
+```bash
+npx @aqualia/alph-cli@latest
+```
+
+Or install globally and run `alph`.
 
 ### Requirements
 
@@ -63,23 +75,38 @@ alph setup
 ### Setup (non-interactive)
 
 ```bash
-# Configure detected agents with an Async.link MCP endpoint (with bearer token)
+# Configure detected agents with a remote MCP endpoint (with bearer token)
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
-  --bearer your-access-token
+  --mcp-server-endpoint https://mcp.example.com/server-id \
+  --bearer ${YOUR_TOKEN}
 
 # Filter to specific agents
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
+  --mcp-server-endpoint https://mcp.example.com/server-id \
   --agents gemini,cursor \
 
 
 # Dry-run preview (no file changes)
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
-  --bearer your-access-token \
+  --mcp-server-endpoint https://mcp.example.com/server-id \
+  --bearer ${YOUR_TOKEN} \
   --agents gemini,cursor \
   --dry-run
+```
+
+### STDIO tools (default-on install)
+
+When you choose `--transport stdio` (or pick STDIO in the wizard), Alph will detect and, by default, install the selected local MCP tool if missing, then run health checks before writing any config. You can opt out:
+
+```bash
+# Disable auto-install
+alph setup --transport stdio --no-install
+
+# Prefer a specific installer
+alph setup --transport stdio --install-manager npm
+
+# Control atomic write strategy
+ALPH_ATOMIC_MODE=copy alph setup --mcp-server-endpoint https://... --agents gemini
 ```
 
 ### Status
@@ -88,6 +115,23 @@ alph setup \
 # Show detected agents and configured MCP servers
 alph status
 ```
+
+### Compatibility Matrix
+
+The following agents are supported across operating systems and transport types:
+
+| Agent        | macOS | Linux | Windows | HTTP | SSE | STDIO |
+|--------------|:-----:|:-----:|:-------:|:----:|:---:|:-----:|
+| Gemini CLI   |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Cursor       |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Claude Code  |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Windsurf     |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Warp         |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Codex CLI    |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+
+Notes:
+- STDIO tools may require a one-time local install. Alph can handle detection and optional installation.
+- Some IDEs manage MCP configuration at project scope; see agent-specific guides in `docs/agents/`.
 
 ### Command reference
 
@@ -102,6 +146,9 @@ alph setup [options]
       --env <list>                  Environment variables (key=value pairs)
       --headers <list>              HTTP headers (key=value pairs)
       --timeout <ms>                Command execution timeout in milliseconds
+      --install-manager <mgr>       Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)
+      --atomic-mode <mode>          Atomic write strategy (auto|copy|rename)
+      --no-install                  Do not auto-install missing STDIO tools (opt-out)
       --agents <list>               Comma-separated agent names to filter
       --dir <path>                  Custom config directory (default: use global agent config locations)
       --dry-run                     Preview changes without writing
@@ -119,6 +166,10 @@ alph remove [options]
       --no-backup                   Do not create backups before removal (advanced)
 ```
 
+### Protocol rendering examples
+
+Moved to `docs/agents/protocol-examples.md` for clarity and maintainability.
+
 ## Why Alph?
 1. **Security**: Local-first design — no network requests and sensitive values are redacted in output.
 2. **Simplicity**: One command configures multiple agents; no manual JSON editing.
@@ -135,12 +186,14 @@ alph remove [options]
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — codebase structure and execution flows
-- [SECURITY.md](./SECURITY.md) — security model, secret handling, backups/rollback
-- [USER_GUIDE.md](./USER_GUIDE.md) — usage examples and command reference
-- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common issues and resolutions
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards and enforcement
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - codebase structure and execution flows
+- [SECURITY.md](./SECURITY.md) - security model, secret handling, backups/rollback
+- [USER_GUIDE.md](./USER_GUIDE.md) - usage examples and command reference
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - common issues and resolutions
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - how to contribute
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) - community standards and enforcement
+ - [docs/AGENT_HANDOFF.md](./docs/AGENT_HANDOFF.md) - concise, complete brief for agents and contributors
+ - [docs/agents](./docs/agents/README.md) - agent-specific configuration guides
 
 
 ## Code of Conduct
@@ -156,5 +209,3 @@ We follow the [Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). By participatin
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-

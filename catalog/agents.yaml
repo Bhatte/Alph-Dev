@@ -1,0 +1,125 @@
+# catalog/agents.yaml
+version: 1
+defaults:
+  containerKey: mcpServers
+  headerPolicies:
+    bearer:
+      headerName: Authorization
+      format: "Bearer ${TOKEN}"
+agents:
+  - id: cursor
+    displayName: Cursor
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.cursor/mcp.json"
+      user:
+        pathTemplate: "${home}/.cursor/mcp.json"
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: cursorStdio
+        fields:
+          command: required
+          args: optional
+          env: optional
+      sse:
+        shape: genericSSE
+        fields:
+          url: required
+          headers: optional
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields:
+          url: required
+          headers: optional
+        headerPolicyRef: bearer
+
+  - id: claude
+    displayName: Claude Code
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.mcp.json"
+      user:
+        pathTemplate: null
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: claudeStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericSSE
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+
+  - id: gemini
+    displayName: Gemini CLI
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.gemini/settings.json"
+      user:
+        pathTemplate: "${home}/.gemini/settings.json"
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: geminiStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericSSE
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+      headerPolicyRef: bearer
+
+  - id: windsurf
+    displayName: Windsurf
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.codeium/windsurf/mcp_config.json"
+      user:
+        pathTemplate: "${home}/.codeium/windsurf/mcp_config.json"
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: claudeStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+
+  - id: warp
+    displayName: Warp
+    writeMode: cli
+    scopes:
+      project:
+        pathTemplate: null
+      user:
+        pathTemplate: null
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: claudeStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer

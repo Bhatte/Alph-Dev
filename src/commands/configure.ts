@@ -9,6 +9,7 @@ import { AgentConfig } from '../agents/provider';
 import { mapAliases, parseAgentNames, validateAgentNames } from '../utils/agents';
 import { existsSync, statSync } from 'fs';
 import { getInquirer } from '../utils/inquirer';
+import { ui } from '../utils/ui';
 
 /**
  * Options for the configure command
@@ -46,6 +47,23 @@ export interface ConfigureCommandOptions {
   timeout?: number;
   /** Whether to create backups when configuring (defaults to true) */
   backup?: boolean;
+  /** Opt out of default-on STDIO tool installation */
+  noInstall?: boolean;
+  /** Preferred installer for STDIO tools */
+  installManager?: 'npm' | 'brew' | 'pipx' | 'cargo' | 'auto';
+  /** Quiet output (suppress info banners; show only final summary) */
+  quiet?: boolean;
+
+  // Proxy flags (Codex bridging to remote via local STDIO proxy)
+  proxyRemoteUrl?: string;
+  proxyTransport?: 'http' | 'sse';
+  proxyBearer?: string;
+  proxyHeader?: string[]; // repeated "K: V"
+
+  /** Prefer installing/using a local Supergateway binary (esp. on Windows) */
+  preferLocalProxyBin?: boolean;
+  /** Directory to install local proxy binaries (default: ~/.alph-mcp) */
+  proxyInstallDir?: string;
 }
 
 /**
@@ -91,8 +109,21 @@ export class ConfigureCommand {
       args: options.args ?? [],
       env: options.env ?? {},
       headers: options.headers ?? {},
-      timeout: options.timeout ?? 0
-      , backup: options.backup ?? true
+      timeout: options.timeout ?? 0,
+      backup: options.backup ?? true,
+      noInstall: options.noInstall ?? (process.env['ALPH_NO_INSTALL'] === '1'),
+      installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto'),
+      quiet: options.quiet ?? false,
+      preferLocalProxyBin: (options.preferLocalProxyBin !== undefined)
+        ? options.preferLocalProxyBin
+        : (process.platform === 'win32' || process.env['ALPH_PREFER_LOCAL_PROXY_BIN'] === '1'),
+      proxyInstallDir: (options.proxyInstallDir !== undefined)
+        ? options.proxyInstallDir
+        : (process.env['ALPH_PROXY_INSTALL_DIR'] ?? ''),
+      proxyRemoteUrl: options.proxyRemoteUrl,
+      proxyTransport: options.proxyTransport,
+      proxyBearer: options.proxyBearer,
+      proxyHeader: options.proxyHeader
     } as Required<ConfigureCommandOptions>;
   }
   
@@ -107,6 +138,11 @@ export class ConfigureCommand {
    */
   public async execute(): Promise<void> {
     this.validateOptions();
+    const start = Date.now();
+    if (!this.options.quiet) {
+      const { logger } = await import('../logger.js');
+      logger.logStructured('info', { message: 'configure:start', context: { transport: this.options.transport, agents: this.options.agents } });
+    }
 
     // Interactive path or default with no flags
     const noFlags = !this.options.mcpServerEndpoint && !this.options.bearer && !this.options.agents && !this.options.dryRun && !this.options.yes;
@@ -133,8 +169,8 @@ export class ConfigureCommand {
     const providerFilter = valid.length > 0 ? valid : undefined;
     
     // Only show detection message if not in interactive mode
-    if (!this.options.interactive) {
-      console.log('\n🔍 Detecting available AI agents...');
+    if (!this.options.interactive && !this.options.quiet) {
+      ui.info('\n[INFO] Detecting available AI agents...');
     }
     
     const detectionResults = await defaultRegistry.detectAvailableAgents(providerFilter, this.options.configDir);
@@ -143,7 +179,7 @@ export class ConfigureCommand {
       // Fallback: if the user explicitly requested agents, proceed to configure them
       // even if no existing config files were detected. Providers will create files.
       if (valid.length > 0) {
-        console.log('\nℹ️  No existing configuration files detected; will create new ones for requested agents.');
+        ui.info('\n[INFO] No existing configuration files detected; will create new ones for requested agents.');
       } else {
         this.handleNoAgentsDetected();
         return;
@@ -153,44 +189,112 @@ export class ConfigureCommand {
     // 2) Build MCP server configuration
     const mcpConfig = await this.getMCPConfig();
     if (!mcpConfig) {
-      console.log('\n❌ Configuration aborted by user');
+      ui.info('\n[CANCELLED] Configuration aborted by user');
       return;
     }
 
     // 3) Build AgentConfig for providers
+    // Apply proxy flags when provided
     let transport = this.options.transport;
+    let endpoint = this.options.mcpServerEndpoint;
+    let bearer = this.options.bearer;
+    const extraHeaders: Record<string, string> = {};
+    if (this.options.proxyRemoteUrl) {
+      endpoint = this.options.proxyRemoteUrl;
+      if (this.options.proxyTransport) transport = this.options.proxyTransport;
+      if (this.options.proxyBearer) bearer = this.options.proxyBearer;
+      if (Array.isArray(this.options.proxyHeader)) {
+        for (const h of this.options.proxyHeader) {
+          const idx = h.indexOf(':');
+          if (idx > 0) {
+            const k = h.slice(0, idx).trim();
+            const v = h.slice(idx + 1).trim();
+            if (k) extraHeaders[k] = v;
+          }
+        }
+      }
+    }
+    // Apply default header policy if bearer present
+    const computedHeaders: Record<string, string> = { ...(this.options.headers || {}), ...extraHeaders };
+    if (bearer && (transport === 'http' || transport === 'sse')) {
+      if (!computedHeaders['Authorization']) {
+        computedHeaders['Authorization'] = `Bearer ${bearer}`;
+      }
+    }
     
     const agentConfig: AgentConfig = {
-      mcpServerId: (this.options.name && this.options.name.trim()) || this.extractServerId(mcpConfig.httpUrl || ''),
-      mcpServerUrl: mcpConfig.httpUrl || '',
-      mcpAccessKey: this.options.bearer,
+      mcpServerId: (this.options.name && this.options.name.trim()) || this.extractServerId((endpoint || mcpConfig.httpUrl || '')),
+      mcpServerUrl: (endpoint || mcpConfig.httpUrl || ''),
+      mcpAccessKey: bearer,
       transport,
-      headers: this.options.headers,
+      headers: computedHeaders,
       env: this.options.env,
       command: this.options.command,
       args: this.options.args,
       cwd: this.options.cwd,
-      timeout: this.options.timeout,
-      configDir: this.options.configDir
+      ...(Number.isFinite(this.options.timeout) && this.options.timeout > 0 ? { timeout: this.options.timeout } : {}),
+      configDir: this.options.configDir,
+      ...(this.options.preferLocalProxyBin ? { preferLocalProxyBin: !!this.options.preferLocalProxyBin } : {}),
+      ...(this.options.proxyInstallDir ? { proxyInstallDir: this.options.proxyInstallDir } : {}),
     };
 
     // 4) Dry-run preview
     if (this.options.dryRun) {
       this.printDryRunPreview(detectedProviders.map(p => p.name), agentConfig);
+      if (!this.options.quiet) {
+        const { logger } = await import('../logger.js');
+        logger.logStructured('info', { message: 'configure:dry-run', context: { providers: detectedProviders.map(p => p.name) } });
+      }
       return;
     }
 
-    // 5) Confirmation (unless --yes)
+    // 5) Preview redacted diff and confirmation (unless --yes)
     if (!this.options.yes) {
+      if ((agentConfig.transport || 'http') === 'stdio') {
+        ui.info('\n[INFO] STDIO selected: tool discovery/install and health checks will be handled in a later step.');
+      }
+      try {
+        const { computeInstallPreview } = await import('../utils/preview.js');
+        ui.info('\n[INFO] Preview of changes (redacted):');
+        for (const p of detectedProviders) {
+          const effectiveConfig = await this.__mapConfigForPreview(p.name, agentConfig);
+          const preview = await computeInstallPreview(p, effectiveConfig);
+          if (!preview) continue;
+          ui.info(`\n— ${p.name} (${preview.configPath})`);
+          ui.info('Before (server snippet):');
+          ui.info(preview.snippetBefore);
+          ui.info('After (server snippet):');
+          ui.info(preview.snippetAfter);
+        }
+      } catch {
+        // non-fatal if preview fails
+      }
+
       const confirmed = await this.confirm(agentConfig, detectedProviders.map(p => p.name));
       if (!confirmed) {
-        console.log('\n❌ Configuration cancelled.');
+        ui.info('\n[CANCELLED] Configuration cancelled.');
         return;
       }
     }
 
     // 6) Configure agents with rollback on any failure
-    await this.configureAgents(agentConfig, detectionResults);
+    try {
+      await this.configureAgents(agentConfig, detectionResults);
+      try {
+        const { telemetry } = await import('../utils/telemetry.js');
+        telemetry.recordConfigure(detectionResults.length, 0, Date.now() - start);
+      } catch {
+        /* ignore telemetry errors */
+      }
+    } catch (e) {
+      try {
+        const { telemetry } = await import('../utils/telemetry.js');
+        telemetry.recordConfigure(0, 1, Date.now() - start);
+      } catch {
+        /* ignore telemetry errors */
+      }
+      throw e;
+    }
   }
   
   /**
@@ -237,12 +341,13 @@ export class ConfigureCommand {
    * Handles case when no agents are detected
    */
   private handleNoAgentsDetected(): void {
-    console.log('\n❌ No supported AI agents detected on this system.');
-    console.log('\nSupported agents and their default locations:');
-    console.log('  • Gemini CLI: ~/.gemini/settings.json');
-    console.log('  • Cursor: Platform-specific configuration');
-    console.log('  • Claude Code: Platform-specific configuration');
-    console.log('\nPlease install at least one supported AI agent and try again.');
+    ui.info('\n❌ No supported AI agents detected on this system.');
+    ui.info('\nSupported agents and their default locations:');
+    ui.info('  • Gemini CLI: ~/.gemini/settings.json');
+    ui.info('  • Cursor: Platform-specific configuration');
+    ui.info('  • Claude Code: Platform-specific configuration');
+    ui.info('  • Codex CLI: ~/.codex/config.toml');
+    ui.info('\nPlease install at least one supported AI agent and try again.');
   }
   
   /**
@@ -336,18 +441,12 @@ export class ConfigureCommand {
       }
       
       if (selectedProviders.length === 0) {
-        console.log(`\n⚠️  None of the requested agents (${requestedAgents.join(', ')}) were detected.`);
+        ui.info(`\n⚠️  None of the requested agents (${requestedAgents.join(', ')}) were detected.`);
         if (detectedProviders.length > 0) {
-          console.log('Detected agents:', detectedProviders.map(p => p.name).join(', '));
+          ui.info('Detected agents: ' + detectedProviders.map(p => p.name).join(', '));
         }
-        console.log('Proceeding to create new configuration files for requested agents.');
+        ui.info('Proceeding to create new configuration files for requested agents.');
       }
-    }
-    
-    // Only show detailed configuration info if not in interactive mode
-    if (!this.options.interactive) {
-      console.log(`\n🔧 Configuring ${selectedProviders.length} selected agent(s)...`);
-      selectedProviders.forEach(p => console.log(`  • ${p.name}`));
     }
     
     const configResults = await defaultRegistry.configureAllDetectedAgents(
@@ -362,37 +461,37 @@ export class ConfigureCommand {
     
     if (configSummary.successful > 0) {
       if (!this.options.interactive) {
-        console.log(`\n✅ Successfully configured ${configSummary.successful} agent(s):`);
+        ui.info(`\n✅ Successfully configured ${configSummary.successful} agent(s):`);
         for (const result of configResults.filter(r => r.success)) {
-          console.log(`  • ${result.provider.name}`);
+          ui.info(`  • ${result.provider.name}`);
           // Try to get the configuration file path from the provider
           try {
             const configPath = await result.provider.detect(agentConfig.configDir);
             if (configPath) {
-              console.log(`    └─ Config file: ${configPath}`);
+              ui.info(`    └─ Config file: ${configPath}`);
             }
           } catch (e) {
             // Ignore errors in getting config path for display purposes
           }
           if (result.backupPath) {
-            console.log(`    └─ Backup created: ${result.backupPath}`);
+            ui.info(`    └─ Backup created: ${result.backupPath}`);
           }
         }
       } else {
         // In interactive mode, show a simpler success message
-        console.log(`\n✅ Successfully configured ${configSummary.successful} agent(s)`);
+        ui.info(`\n✅ Successfully configured ${configSummary.successful} agent(s)`);
       }
     }
     
     if (configSummary.failed > 0) {
       if (!this.options.interactive) {
-        console.log(`\n❌ Failed to configure ${configSummary.failed} agent(s):`);
+        ui.info(`\n❌ Failed to configure ${configSummary.failed} agent(s):`);
         for (const failed of configResults.filter(r => !r.success)) {
-          console.log(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
+          ui.info(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
         }
       } else {
         // In interactive mode, show a simpler failure message
-        console.log(`\n❌ Failed to configure ${configSummary.failed} agent(s)`);
+        ui.info(`\n❌ Failed to configure ${configSummary.failed} agent(s)`);
       }
 
       // Propagate error so callers/tests can handle as a rejected promise
@@ -401,20 +500,20 @@ export class ConfigureCommand {
     }
     
     if (!this.options.interactive) {
-      console.log('\n✨ Configuration complete!');
+      ui.info('\n✨ Configuration complete!');
       
       // Show summary of all configured agents
       if (configSummary.successful > 0) {
-        console.log('\n📋 Configuration Summary:');
-        console.log('='.repeat(40));
-        console.log('The following agents have been configured with your MCP server:');
+        ui.info('\n📋 Configuration Summary:');
+        ui.info('='.repeat(40));
+        ui.info('The following agents have been configured with your MCP server:');
         for (const result of configResults.filter(r => r.success)) {
-          console.log(`  • ${result.provider.name}`);
+          ui.info(`  • ${result.provider.name}`);
           // Try to get the configuration file path from the provider
           try {
             const configPath = await result.provider.detect(agentConfig.configDir);
             if (configPath) {
-              console.log(`    └─ Configuration file: ${configPath}`);
+              ui.info(`    └─ Configuration file: ${configPath}`);
             }
           } catch (e) {
             // Ignore errors in getting config path for display purposes
@@ -423,17 +522,17 @@ export class ConfigureCommand {
         
         // Show backup summary
         if (configSummary.backupPaths.length > 0) {
-          console.log('\n💾 Backup Summary:');
-          console.log('='.repeat(40));
-          console.log('The following backup files were created:');
+          ui.info('\n💾 Backup Summary:');
+          ui.info('='.repeat(40));
+          ui.info('The following backup files were created:');
           for (const backup of configSummary.backupPaths) {
-            console.log(`  • ${backup.provider}: ${backup.backupPath}`);
+            ui.info(`  • ${backup.provider}: ${backup.backupPath}`);
           }
         }
       }
     } else {
       // In interactive mode, show a simpler completion message
-      console.log('\n✨ Configuration complete!');
+      ui.info('\n✨ Configuration complete!');
     }
   }
 
@@ -444,37 +543,84 @@ export class ConfigureCommand {
   }
 
   private printDryRunPreview(providers: string[], agentConfig: AgentConfig): void {
-    console.log('\n🔎 Dry-run: planned configuration');
-    console.log('='.repeat(40));
-    console.log('Agents to configure:');
-    providers.forEach(p => console.log(`  • ${p}`));
-    console.log('\nMCP server:');
-    console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • URL: ${agentConfig.mcpServerUrl}`);
-    console.log(`  • Transport: ${agentConfig.transport}`);
+    ui.info('\n🔎 Dry-run: planned configuration');
+    ui.info('='.repeat(40));
+    ui.info('Agents to configure:');
+    providers.forEach(p => ui.info(`  • ${p}`));
+    ui.info('\nMCP server:');
+    const endpointDisplay = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
+    ui.info(`  Endpoint: ${endpointDisplay}`);
+    ui.info(`  • ID: ${agentConfig.mcpServerId}`);
+    ui.info(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
-      console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
+      ui.info(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
     }
-    console.log('\nNote: this is a preview only. No files were modified.');
+    ui.info('\nNote: this is a preview only. No files were modified.');
   }
 
   private async confirm(agentConfig: AgentConfig, providers: string[]): Promise<boolean> {
-    console.log('\n🔍 Configuration Summary');
-    console.log('='.repeat(40));
-    console.log('The following agents will be configured:');
-    providers.forEach(p => console.log(`  • ${p}`));
-    console.log('\nMCP Server Configuration:');
-    console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • Endpoint: ${agentConfig.mcpServerUrl}`);
-    console.log(`  • Transport: ${agentConfig.transport}`);
+    ui.info('\n🔍 Configuration Summary');
+    ui.info('='.repeat(40));
+    ui.info('The following agents will be configured:');
+    providers.forEach(p => ui.info(`  • ${p}`));
+    ui.info('\nMCP Server Configuration:');
+    const endpointDisplay2 = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
+    ui.info(`  Endpoint: ${endpointDisplay2}`);
+    ui.info(`  • ID: ${agentConfig.mcpServerId}`);
+    ui.info(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
-      console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
+      ui.info(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
     }
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt([
       { type: 'confirm', name: 'confirmed', message: 'Apply these changes?', default: true }
     ]);
     return confirmed;
+  }
+
+  // Provider-specific preview mapping: show Codex as STDIO via Supergateway when remote proxy flags are used
+  private async __mapConfigForPreview(providerName: string, config: AgentConfig): Promise<AgentConfig> {
+    if (providerName === 'Codex CLI' && (config.transport === 'http' || config.transport === 'sse')) {
+      const { buildSupergatewayArgs, ensureLocalSupergatewayBin } = await import('../utils/proxy.js');
+      const headersRecord = config.headers || {};
+      let bearer = config.mcpAccessKey;
+      const authHeader = headersRecord['Authorization'] || (headersRecord as any)['authorization'];
+      if (!bearer && typeof authHeader === 'string') {
+        const m = authHeader.match(/Bearer\s+(.+)/i);
+        if (m) bearer = m[1];
+      }
+      const headers = Object.entries(headersRecord)
+        .filter(([k]) => k.toLowerCase() !== 'authorization')
+        .map(([key, value]) => ({ key, value: String(value) }));
+      const argv = buildSupergatewayArgs({
+        remoteUrl: config.mcpServerUrl || '',
+        transport: config.transport,
+        bearer,
+        headers,
+      });
+      const pin = process?.env?.['ALPH_PROXY_VERSION'] || '3.4.0';
+      const preferLocal = config.preferLocalProxyBin === true || (process.platform === 'win32' && config.preferLocalProxyBin !== false);
+      if (preferLocal) {
+        try {
+          const binPath = ensureLocalSupergatewayBin(config.proxyInstallDir, pin);
+          return {
+            ...config,
+            transport: 'stdio',
+            command: binPath,
+            args: argv,
+          };
+        } catch {
+          // fall through to npx
+        }
+      }
+      return {
+        ...config,
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', `supergateway@${pin}`, ...argv],
+      };
+    }
+    return config;
   }
 }
 
@@ -488,8 +634,18 @@ export async function executeConfigureCommand(options: ConfigureCommandOptions =
     const command = new ConfigureCommand(options);
     await command.execute();
   } catch (error) {
-    console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error');
+    ui.error('\n❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
     // Re-throw so integration tests can assert on the failure instead of process exiting
     throw (error instanceof Error ? error : new Error(String(error)));
   }
 }
+
+
+
+
+
+
+
+
+
+

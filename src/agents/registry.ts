@@ -7,9 +7,14 @@
  */
 
 import { AgentProvider, AgentConfig, ProviderDetectionResult, ProviderConfigurationResult, RemovalConfig, ProviderRemovalResult } from './provider';
+import { buildSupergatewayArgs, ensureLocalSupergatewayBin } from '../utils/proxy';
 import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
+import { WindsurfProvider } from './windsurf';
+import { WarpProvider } from './warp';
+import { CodexProvider } from './codex';
+import { ui } from '../utils/ui';
 
 /**
  * Configuration options for the agent registry
@@ -85,6 +90,11 @@ export class AgentRegistry {
     this.registerProvider(new GeminiProvider());
     this.registerProvider(new CursorProvider());
     this.registerProvider(new ClaudeProvider());
+    // New: Windsurf and Warp
+    this.registerProvider(new WindsurfProvider());
+    this.registerProvider(new WarpProvider());
+    // New: Codex CLI
+    this.registerProvider(new CodexProvider());
   }
 
   /**
@@ -427,7 +437,9 @@ export class AgentRegistry {
   ): Promise<ProviderConfigurationResult> {
     let timeoutId: NodeJS.Timeout | undefined;
     try {
-      const configurationPromise = provider.configure(config, backup);
+      // Provider-specific mapping: Codex requires STDIO. If user selected http/sse, bridge via Supergateway.
+      const effectiveConfig = this.__mapConfigForProvider(provider, config);
+      const configurationPromise = provider.configure(effectiveConfig, backup);
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('Configuration timeout')), this.options.configurationTimeout);
       });
@@ -448,6 +460,70 @@ export class AgentRegistry {
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
+  }
+
+  // Map remote transports to local STDIO invocation for providers that require it (e.g., Codex CLI)
+  private __mapConfigForProvider(provider: AgentProvider, config: AgentConfig): AgentConfig {
+    if (provider.name === 'Codex CLI' && (config.transport === 'http' || config.transport === 'sse')) {
+      const headersRecord = config.headers || {};
+      // Prefer explicit access key; fallback to Authorization header if present
+      let bearer = config.mcpAccessKey;
+      const authHeader = headersRecord['Authorization'] || headersRecord['authorization'];
+      if (!bearer && typeof authHeader === 'string') {
+        const m = authHeader.match(/Bearer\s+(.+)/i);
+        if (m) bearer = m[1];
+      }
+      const headers = Object.entries(headersRecord)
+        .filter(([k]) => k.toLowerCase() !== 'authorization')
+        .map(([key, value]) => ({ key, value: String(value) }));
+
+      const argv = buildSupergatewayArgs({
+        remoteUrl: config.mcpServerUrl || '',
+        transport: config.transport,
+        bearer,
+        headers,
+      });
+
+      const pin = process?.env?.['ALPH_PROXY_VERSION'] || '3.4.0';
+      const useDocker = (config.command || '').toLowerCase() === 'docker';
+
+      // Prefer local binary on Windows by default or when explicitly requested
+      const preferLocal = config.preferLocalProxyBin === true || (process.platform === 'win32' && config.preferLocalProxyBin !== false);
+
+      if (useDocker) {
+        // Docker mapping unchanged
+        return {
+          ...config,
+          transport: 'stdio',
+          command: 'docker',
+          args: ['run', '--rm', `ghcr.io/supercorp-ai/supergateway:${pin}`, ...argv],
+        };
+      }
+
+      if (preferLocal) {
+        // Ensure local install and point directly to the .bin shim
+        try {
+          const binPath = ensureLocalSupergatewayBin(config.proxyInstallDir, pin);
+          return {
+            ...config,
+            transport: 'stdio',
+            command: binPath,
+            args: argv,
+          };
+        } catch (e) {
+          // Fall back to npx if local install fails for any reason
+        }
+      }
+
+      // Default: npx invocation (cross-platform), will be normalized to npx.cmd on Windows by Codex provider
+      return {
+        ...config,
+        transport: 'stdio',
+        command: config.command || 'npx',
+        args: ['-y', `supergateway@${pin}`, ...argv],
+      };
+    }
+    return config;
   }
 
   /**
@@ -473,7 +549,7 @@ export class AgentRegistry {
         }
       } catch (rollbackError) {
         // Log rollback errors but don't throw - we want to attempt all rollbacks
-        console.error(`Failed to rollback ${result.provider.name}: ${rollbackError}`);
+        ui.error(`Failed to rollback ${result.provider.name}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
       }
     });
 
@@ -801,9 +877,9 @@ export class AgentRegistry {
           await result.provider.rollback();
         }
       } catch (rollbackError) {
-        // Log rollback errors but don't throw - we want to attempt all rollbacks
-        console.error(`Failed to rollback ${result.provider.name}: ${rollbackError}`);
-      }
+    // Log rollback errors but don't throw - we want to attempt all rollbacks
+    ui.error(`Failed to rollback ${result.provider.name}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+  }
     });
 
     await Promise.all(rollbackPromises);
@@ -940,7 +1016,10 @@ export function createRegistryWithProviders(providerNames: string[]): AgentRegis
   const providerMap: Record<string, () => AgentProvider> = {
     'Gemini CLI': () => new GeminiProvider(),
     'Cursor': () => new CursorProvider(),
-    'Claude Code': () => new ClaudeProvider()
+    'Claude Code': () => new ClaudeProvider(),
+    'Codex CLI': () => new CodexProvider(),
+    'Windsurf': () => new WindsurfProvider(),
+    'Warp': () => new WarpProvider()
   };
 
   // Register requested providers

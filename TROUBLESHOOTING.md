@@ -10,6 +10,28 @@ This document provides solutions to common issues you may encounter while using 
 - [Platform-Specific Issues](#platform-specific-issues)
 - [Getting Help](#getting-help)
 
+## Codex & Proxy Integration
+
+- Codex requires a local STDIO proxy for remote servers
+  - Symptom: HTTP/SSE entries are ignored by Codex.
+  - Fix: Use proxy flags: `--proxy-transport http|sse` and `--proxy-remote-url <URL>`. Alph writes a STDIO entry that runs Supergateway.
+
+- First-run latency with `npx`
+  - Symptom: Timeout on first proxy launch.
+  - Fix: Alph pre-warms `npx -y supergateway --help` and sets `startup_timeout_ms = 60000` for generic runners unless customized.
+
+- Transport mismatch (SSE vs HTTP)
+  - Symptom: Connection opens but streaming fails or hangs.
+  - Fix: Prefer Streamable HTTP; use `--proxy-transport http` unless server is SSE-only.
+
+- Version pinning
+  - Symptom: Regression with newer proxy release.
+  - Fix: Set `ALPH_PROXY_VERSION=<version>` or pass `--proxy-version <version>`.
+
+- Rollback and backups
+  - Symptom: Corrupted or invalid TOML.
+  - Fix: Alph writes atomically with a timestamped backup and rolls back on validation failure. See `npm run drills:rollback`.
+
 ## Installation Issues
 
 ### "Command not found" after installation
@@ -40,6 +62,24 @@ sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
 # Option 2: Use a different prefix
 npm config set prefix ~/.local
 export PATH="$PATH:~/.local/bin"
+
+## Codex CLI doesn’t see my STDIO MCP server
+
+Symptoms:
+- You added an `[mcp_servers.<name>]` entry in `~/.codex/config.toml`, but tools don’t appear or the server seems to never start.
+
+Common causes and fixes:
+- First‑run timeouts with `npx`/`yarn dlx`/`pnpm dlx`:
+  - On first run these commands may download packages, exceeding Codex’s 10s default. Alph now pre‑warms such invocations and sets `startup_timeout_ms = 60000` automatically. If you customized timeouts earlier, increase them to at least 60000.
+- Package not present on PATH when using a dedicated binary:
+  - Use Alph’s installer flow or install the tool globally (e.g., `npm i -g <pkg>`), then re‑run Alph.
+- Invalid TOML shape:
+  - Ensure the top‑level key is `mcp_servers` (not `mcpServers`) per Codex docs.
+
+Manual refresh tip:
+- Codex lazily starts MCP servers. Triggering a tool that uses the server forces a launch; restarting Codex also reloads config.
+
+---
 
 # Option 3: Use npx (no global install)
 npx --yes -p @aqualia/alph-cli alph setup --mcp-server-endpoint https://askhuman.net/mcp/ID --bearer KEY -y

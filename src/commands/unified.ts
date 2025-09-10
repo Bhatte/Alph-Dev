@@ -13,6 +13,7 @@ import { executeConfigureCommand, ConfigureCommandOptions } from './configure';
 import { executeStatusCommand } from './status';
 import { executeRemoveCommand, RemoveCommandOptions } from './remove';
 import { startInteractiveConfig } from './interactive';
+import { proxyRun, proxyHealth } from './proxy';
 
 /**
  * Unified command implementation
@@ -45,7 +46,16 @@ export class UnifiedCommand {
     this.program
       .name('alph')
       .description('')
-      .version(packageJson.version, '-v, --version', 'Show version');
+      .version(packageJson.version, '-v, --version', 'Show version')
+      .option('--verbose', 'Enable verbose logging', false)
+      .hook('preAction', (thisCommand) => {
+        // Commander v11: prefer optsWithGlobals when available
+        const anyCmd: any = thisCommand as any;
+        const opts = typeof anyCmd.optsWithGlobals === 'function' ? anyCmd.optsWithGlobals() : thisCommand.opts();
+        if (opts && opts.verbose) {
+          process.env['ALPH_VERBOSE'] = '1';
+        }
+      });
 
     // Removed global interactive flag (-i). Use 'setup' command for interactive flow.
 
@@ -61,15 +71,22 @@ export class UnifiedCommand {
       .option('--args <list>', 'Comma-separated arguments for command execution')
       .option('--env <list>', 'Environment variables (key=value pairs)')
       .option('--headers <list>', 'HTTP headers (key=value pairs)')
+      .option('--proxy-remote-url <url>', 'Remote MCP URL for local proxy (Codex)')
+      .option('--proxy-transport <type>', 'Proxy transport (http|sse)')
+      .option('--proxy-bearer <token>', 'Proxy Authorization bearer (redacted)')
+      .option('--proxy-header <K: V...>', 'Proxy header (repeatable)', (val, acc: string[]) => { acc.push(val); return acc; }, [])
       .option('--timeout <ms>', 'Command execution timeout in milliseconds')
+      .option('--install-manager <mgr>', 'Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)')
+      .option('--atomic-mode <mode>', 'Atomic write strategy (auto|copy|rename)')
+      .option('--no-install', 'Do not auto-install missing STDIO tools (opt-out)')
       .option('--agents <list>', 'Comma-separated agent names to filter')
       .option('--dir <path>', 'Custom config directory (default: use global agent config locations)')
       .option('--dry-run', 'Preview changes without writing', false)
       .option('--no-backup', 'Do not create backups before configuration (advanced)')
       .option('--name <id>', 'Name of the MCP server (optional)')
-      .action(async (opts: { mcpServerEndpoint?: string; bearer?: string; transport?: 'http'|'sse'|'stdio'; command?: string; cwd?: string; args?: string; env?: string; headers?: string; timeout?: string; agents?: string; dir?: string; dryRun?: boolean; backup?: boolean; name?: string }) => {
+      .action(async (opts: { mcpServerEndpoint?: string; bearer?: string; transport?: 'http'|'sse'|'stdio'; command?: string; cwd?: string; args?: string; env?: string; headers?: string; timeout?: string; agents?: string; dir?: string; dryRun?: boolean; backup?: boolean; name?: string; install?: boolean; installManager?: string; atomicMode?: 'auto'|'copy'|'rename'; proxyRemoteUrl?: string; proxyTransport?: 'http'|'sse'; proxyBearer?: string; proxyHeader?: string[] }) => {
         // If no options provided, default to interactive wizard (simplified UX)
-        const hasAnyOption = opts.mcpServerEndpoint || opts.bearer || opts.transport || opts.command || opts.cwd || opts.args || opts.env || opts.headers || opts.timeout || opts.agents || opts.dir || opts.dryRun || opts.name || opts.backup === false;
+        const hasAnyOption = opts.mcpServerEndpoint || opts.bearer || opts.transport || opts.command || opts.cwd || opts.args || opts.env || opts.headers || opts.timeout || opts.agents || opts.dir || opts.dryRun || opts.name || opts.backup === false || opts.proxyRemoteUrl || opts.proxyTransport || opts.proxyBearer || (opts.proxyHeader && opts.proxyHeader.length > 0);
         if (!hasAnyOption) {
           await startInteractiveConfig({});
           return;
@@ -122,6 +139,11 @@ export class UnifiedCommand {
             return acc;
           }, {} as Record<string, string>);
         }
+        // Proxy flags forwarding
+        if (opts.proxyRemoteUrl !== undefined) (configureOptions as any).proxyRemoteUrl = opts.proxyRemoteUrl;
+        if (opts.proxyTransport !== undefined) (configureOptions as any).proxyTransport = opts.proxyTransport as any;
+        if (opts.proxyBearer !== undefined) (configureOptions as any).proxyBearer = opts.proxyBearer;
+        if (opts.proxyHeader !== undefined) (configureOptions as any).proxyHeader = opts.proxyHeader;
         if (opts.timeout !== undefined) {
           configureOptions.timeout = parseInt(opts.timeout, 10);
         }
@@ -135,15 +157,72 @@ export class UnifiedCommand {
           configureOptions.name = opts.name;
         }
         
+        if (opts.install === false) {
+          (configureOptions as any).noInstall = true;
+        }
+        if (opts.installManager) {
+          (configureOptions as any).installManager = opts.installManager as any;
+        }
+        if (opts.atomicMode) {
+          process.env['ALPH_ATOMIC_MODE'] = opts.atomicMode;
+        }
+
         await executeConfigureCommand(configureOptions);
+      });
+
+    // proxy subcommands
+    const proxy = this.program
+      .command('proxy')
+      .description('Local MCP proxy helpers (Supergateway wrapper)');
+
+    proxy
+      .command('run')
+      .description('Run a local STDIO↔HTTP/SSE proxy for Codex')
+      .requiredOption('--remote-url <url>', 'Remote MCP URL')
+      .requiredOption('--transport <type>', 'Transport protocol (http|sse)')
+      .option('--bearer <token>', 'Authorization bearer token (redacted in logs)')
+      .option('--header <K: V...>', 'Additional header (repeatable)', (val, acc: string[]) => { acc.push(val); return acc; }, [])
+      .option('--proxy-version <ver>', 'Supergateway version (default: v3.4.0)')
+      .option('--docker', 'Use Docker image instead of npx', false)
+      .action(async (opts: { remoteUrl: string; transport: 'http'|'sse'; bearer?: string; header?: string[]; proxyVersion?: string; docker?: boolean }) => {
+        const runOpts: any = {
+          remoteUrl: opts.remoteUrl,
+          transport: opts.transport,
+        };
+        if (opts.bearer !== undefined) runOpts.bearer = opts.bearer;
+        if (opts.header !== undefined) runOpts.header = opts.header;
+        if (opts.proxyVersion !== undefined) runOpts.proxyVersion = opts.proxyVersion;
+        if (opts.docker !== undefined) runOpts.docker = opts.docker;
+        const code = await proxyRun(runOpts);
+        if (code !== 0) process.exit(code);
+      });
+
+    proxy
+      .command('health')
+      .description('Validate remote MCP URL and transport inputs')
+      .requiredOption('--remote-url <url>', 'Remote MCP URL')
+      .requiredOption('--transport <type>', 'Transport protocol (http|sse)')
+      .option('--bearer <token>', 'Authorization bearer token (redacted in logs)')
+      .option('--header <K: V...>', 'Additional header (repeatable)', (val, acc: string[]) => { acc.push(val); return acc; }, [])
+      .option('--proxy-version <ver>', 'Supergateway version for preview (default: v3.4.0)')
+      .action(async (opts: { remoteUrl: string; transport: 'http'|'sse'; bearer?: string; header?: string[] }) => {
+        const healthOpts: any = { remoteUrl: opts.remoteUrl, transport: opts.transport };
+        if (opts.bearer !== undefined) healthOpts.bearer = opts.bearer;
+        if (opts.header !== undefined) healthOpts.header = opts.header;
+        if ((opts as any).proxyVersion !== undefined) healthOpts.proxyVersion = (opts as any).proxyVersion;
+        const code = await proxyHealth(healthOpts);
+        if (code !== 0) process.exit(code);
       });
 
     // status subcommand
     this.program
       .command('status')
-      .description('📊 Show detected agents and current MCP entries')
-      .action(async () => {
-        await executeStatusCommand();
+      .description('Show detected agents and current MCP entries')
+      .option('--format <fmt>', 'Output format (list|json)', 'list')
+      .option('--agent <name>', 'Filter by agent name (contains)')
+      .option('--problems', 'Show only agents with issues', false)
+      .action(async (opts: { format?: 'list'|'json'; agent?: string; problems?: boolean }) => {
+        await executeStatusCommand({ format: (opts.format as any) || 'list', agent: (opts.agent || ''), problems: !!opts.problems });
       });
 
     // remove subcommand
@@ -191,7 +270,7 @@ export class UnifiedCommand {
     // Root command action
     this.program
       .action(async (_options: any) => {
-        const noSubcommand = process.argv.length <= 2 || !['setup', 'status', 'remove'].some(sub => process.argv.includes(sub));
+    const noSubcommand = process.argv.length <= 2 || !['setup', 'status', 'remove', 'proxy'].some(sub => process.argv.includes(sub));
 
         // Default behavior: show banner and help when no subcommand
         if (noSubcommand) {
@@ -276,3 +355,8 @@ export function __normalizeConfigureForwarding(rawOpts: any, argv: string[]) {
     agents,
   };
 }
+
+
+
+
+

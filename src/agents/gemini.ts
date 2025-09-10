@@ -6,6 +6,8 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
+import { ui } from '../utils/ui';
 
 /**
  * Gemini CLI provider for configuring Google's Gemini CLI tool
@@ -33,13 +35,14 @@ export class GeminiProvider implements AgentProvider {
    * @returns Default path to Gemini settings.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
-    // If custom config directory is provided, use it
-    if (configDir) {
-      return join(configDir, '.gemini', 'settings.json');
-    }
-    
+    // Prefer explicit env override when set
     const envOverride = AgentDetector.getEnvOverridePath('gemini');
-    return envOverride ?? AgentDetector.getDefaultConfigPath('gemini');
+    if (envOverride) return envOverride;
+    // Prefer catalog-derived path
+    if (configDir && configDir.trim()) {
+      return resolveConfigPath('gemini', 'project', configDir) || join(configDir, '.gemini', 'settings.json');
+    }
+    return resolveConfigPath('gemini', 'user') || AgentDetector.getDefaultConfigPath('gemini');
   }
 
   /**
@@ -394,71 +397,25 @@ export class GeminiProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Gemini configuration
    */
-  private injectMCPServerConfig(geminiConfig: GeminiConfig, config: AgentConfig): GeminiConfig {
-    // Create a copy of the configuration to avoid mutations
+  private async injectMCPServerConfig(geminiConfig: GeminiConfig, config: AgentConfig): Promise<GeminiConfig> {
     const modifiedConfig: GeminiConfig = { ...geminiConfig };
-
-    // Initialize mcpServers section if it doesn't exist
-    if (!modifiedConfig.mcpServers) {
-      modifiedConfig.mcpServers = {};
-    }
-
-    // Prepare env as-is (no header folding into env)
-    const envVars: Record<string, string> | undefined = (config.env && Object.keys(config.env).length > 0) ? { ...config.env } : undefined;
-
-    // Build server configuration based on transport, per Gemini docs
-    const transport = config.transport || 'http';
-    const serverConfig: Exclude<GeminiConfig['mcpServers'], undefined>[string] = {} as any;
-
-    // Transport field: include only when provided and not default 'http'
-    if (config.transport && config.transport !== 'http') {
-      (serverConfig as any).transport = config.transport;
-    }
-
-    // stdio: command/args/cwd
-    if (transport === 'stdio') {
-      if (config.command) {
-        (serverConfig as any).command = config.command;
-      }
-      if (config.args) {
-        (serverConfig as any).args = config.args;
-      }
-      if (config.cwd) {
-        (serverConfig as any).cwd = config.cwd;
-      }
-    }
-
-    // HTTP: httpUrl + headers
-    if (transport === 'http') {
-      if (config.mcpServerUrl) {
-        (serverConfig as any).httpUrl = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        (serverConfig as any).headers = { ...config.headers };
-      }
-    }
-
-    // SSE: url + headers
-    if (transport === 'sse') {
-      if (config.mcpServerUrl) {
-        (serverConfig as any).url = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        (serverConfig as any).headers = { ...config.headers };
-      }
-    }
-
-    // Common: env, timeout
-    if (envVars) {
-      (serverConfig as any).env = envVars;
-    }
-    if (config.timeout && typeof config.timeout === 'number') {
-      (serverConfig as any).timeout = config.timeout;
-    }
-
-    // Inject the server configuration
-    modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
-
+    if (!modifiedConfig.mcpServers) modifiedConfig.mcpServers = {};
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'gemini',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      cwd: config.cwd,
+      env: config.env,
+      timeout: config.timeout
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverEntry = (rendered as any)['mcpServers'][config.mcpServerId];
+    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as any;
     return modifiedConfig;
   }
 
@@ -502,8 +459,7 @@ export class GeminiProvider implements AgentProvider {
       const log = (reason: string, extra?: unknown) => {
         if (DBG) {
           try {
-            // eslint-disable-next-line no-console
-            console.error(`[Gemini.validate] ${reason}` + (extra !== undefined ? ` :: ${JSON.stringify(extra)}` : ''));
+            ui.debug(`[Gemini.validate] ${reason}` + (extra !== undefined ? ` :: ${JSON.stringify(extra)}` : ''));
           } catch {
             // noop
           }
@@ -540,6 +496,13 @@ export class GeminiProvider implements AgentProvider {
           if (serverConfig.httpUrl && typeof serverConfig.httpUrl !== 'string') {
             return fail('httpUrl present but not a string', { serverId, httpUrl: serverConfig.httpUrl });
           }
+          // Accept alternative http 'url' when transport explicitly set to http
+          if ((serverConfig as any).transport === 'http') {
+            const altUrl = (serverConfig as any).url;
+            if (altUrl !== undefined && typeof altUrl !== 'string') {
+              return fail('http transport with non-string url', { serverId, url: altUrl });
+            }
+          }
 
           // Validate SSE url if present
           if ((serverConfig as any).url && typeof (serverConfig as any).url !== 'string') {
@@ -551,9 +514,15 @@ export class GeminiProvider implements AgentProvider {
             return fail('env present but not an object', { serverId });
           }
 
-          // Validate headers if present
+          // Validate headers if present (support generic and transport-specific keys)
           if ((serverConfig as any).headers && typeof (serverConfig as any).headers !== 'object') {
             return fail('headers present but not an object', { serverId });
+          }
+          if ((serverConfig as any).httpHeaders && typeof (serverConfig as any).httpHeaders !== 'object') {
+            return fail('httpHeaders present but not an object', { serverId });
+          }
+          if ((serverConfig as any).sseHeaders && typeof (serverConfig as any).sseHeaders !== 'object') {
+            return fail('sseHeaders present but not an object', { serverId });
           }
 
           if (serverConfig.disabled !== undefined && typeof serverConfig.disabled !== 'boolean') {
@@ -590,8 +559,9 @@ export class GeminiProvider implements AgentProvider {
           // Compare URL according to expected transport
           if (expectedMCPConfig.mcpServerUrl) {
             if (expectedMCPConfig.transport === 'http') {
-              if (serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
-                return fail('expected httpUrl mismatch', { expected: expectedMCPConfig.mcpServerUrl, actual: serverConfig.httpUrl });
+              const actual = serverConfig.httpUrl || (serverConfig as any).url;
+              if (actual !== expectedMCPConfig.mcpServerUrl) {
+                return fail('expected http url mismatch', { expected: expectedMCPConfig.mcpServerUrl, actual });
               }
             } else if (expectedMCPConfig.transport === 'sse') {
               const actualUrl = (serverConfig as any).url;
@@ -623,8 +593,7 @@ export class GeminiProvider implements AgentProvider {
     } catch (error) {
       const DBG = process?.env?.['ALPH_DEBUG_GEMINI'] === '1';
       if (DBG) {
-        // eslint-disable-next-line no-console
-        console.error('[Gemini.validate] exception during validation', error);
+        ui.debug('[Gemini.validate] exception during validation ' + (error instanceof Error ? error.message : String(error)));
       }
       return false;
     }
