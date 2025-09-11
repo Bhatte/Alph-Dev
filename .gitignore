@@ -67,3 +67,6 @@ askhumanctl.exe
 # Test config directories
 .gemini/
 node_modules
+
+#documents 
+docs/agents

@@ -21,6 +21,8 @@ export interface RemoveCommandOptions {
   agents?: string[] | string;
   /** Custom config directory (default: use global agent config locations) */
   configDir?: string;
+  /** Removal scope: auto|global|project|all (default: auto) */
+  scope?: 'auto' | 'global' | 'project' | 'all';
   /** Skip confirmation */
   yes?: boolean;
   /** Preview changes without removing */
@@ -54,6 +56,7 @@ export class RemoveCommand {
   private options: RemoveCommandOptions & {
     agents: string | string[];
     configDir: string;
+    scope: 'auto' | 'global' | 'project' | 'all';
     yes: boolean;
     dryRun: boolean;
     interactive: boolean;
@@ -68,6 +71,7 @@ export class RemoveCommand {
         ? options.agents 
         : (options.agents ?? ''),
       configDir: options.configDir ?? '',
+      scope: options.scope ?? 'auto',
       yes: options.yes ?? false,
       dryRun: options.dryRun ?? false,
       interactive: options.interactive ?? false,
@@ -212,6 +216,7 @@ export class RemoveCommand {
     const removalConfig: RemovalConfig = {
       mcpServerId: this.options.serverName,
       configDir: this.options.configDir,
+      scope: this.options.scope,
       backup: this.options.backup
     };
 
@@ -300,6 +305,9 @@ export class RemoveCommand {
     ui.info('='.repeat(40));
     ui.info('MCP server to remove:');
     ui.info(`  • Server ID: ${removalConfig.mcpServerId}`);
+    if (removalConfig.scope) {
+      ui.info(`  • Scope: ${removalConfig.scope}`);
+    }
     ui.info('\nAgents that will be affected:');
     providersWithServer.forEach(({provider}) => ui.info(`  • ${provider.name}`));
     ui.info('\nBackup behavior:');
@@ -315,6 +323,7 @@ export class RemoveCommand {
     ui.info('='.repeat(40));
     ui.info('The following MCP server configuration will be removed:');
     ui.info(`  • Server ID: ${removalConfig.mcpServerId}`);
+    if (removalConfig.scope) ui.info(`  • Scope: ${removalConfig.scope}`);
     ui.info('\nFrom these agents:');
     providersWithServer.forEach(({provider}) => ui.info(`  • ${provider.name}`));
     
@@ -408,6 +417,12 @@ export class RemoveCommand {
         for (const backup of removalSummary.backupPaths) {
           ui.info(`  • ${backup.provider}: ${backup.backupPath}`);
         }
+      }
+
+      // User hinting for Claude
+      const removedClaude = removalResults.some(r => r.success && r.provider.name === 'Claude Code');
+      if (removedClaude) {
+        ui.info('\nℹ️  If Claude is running, please restart it.');
       }
     }
   }

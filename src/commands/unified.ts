@@ -221,8 +221,11 @@ export class UnifiedCommand {
       .option('--format <fmt>', 'Output format (list|json)', 'list')
       .option('--agent <name>', 'Filter by agent name (contains)')
       .option('--problems', 'Show only agents with issues', false)
-      .action(async (opts: { format?: 'list'|'json'; agent?: string; problems?: boolean }) => {
-        await executeStatusCommand({ format: (opts.format as any) || 'list', agent: (opts.agent || ''), problems: !!opts.problems });
+      .option('--dir <path>', 'Project directory to include project-level configs (Claude)')
+      .action(async (opts: { format?: 'list'|'json'; agent?: string; problems?: boolean; dir?: string }) => {
+        const statusOpts: any = { format: (opts.format as any) || 'list', agent: (opts.agent || ''), problems: !!opts.problems };
+        if (opts.dir !== undefined) statusOpts.dir = opts.dir;
+        await executeStatusCommand(statusOpts);
       });
 
     // remove subcommand
@@ -232,11 +235,12 @@ export class UnifiedCommand {
       .option('--server-name <name>', 'MCP server name to remove')
       .option('--agents <list>', 'Comma-separated agent names to filter')
       .option('--dir <path>', 'Custom config directory (default: use global agent config locations)')
+      .option('--scope <scope>', 'Removal scope (auto|global|project|all)', 'auto')
       .option('--dry-run', 'Preview changes without removing', false)
       .option('-y, --yes', 'Skip confirmation prompt', false)
       .option('-i, --interactive', 'Launch interactive removal wizard', false)
       .option('--no-backup', 'Do not create backups before removal (advanced)')
-      .action(async (opts: { serverName?: string; agents?: string; dir?: string; dryRun?: boolean; yes?: boolean; interactive?: boolean; backup?: boolean }) => {
+      .action(async (opts: { serverName?: string; agents?: string; dir?: string; scope?: 'auto'|'global'|'project'|'all'; dryRun?: boolean; yes?: boolean; interactive?: boolean; backup?: boolean }) => {
         // Check if user ran remove with no options - show interactive wizard
         const hasAnyOption = opts.serverName || opts.agents || opts.dir || opts.dryRun || opts.yes || opts.interactive || opts.backup === false;
         if (!hasAnyOption) {
@@ -259,6 +263,9 @@ export class UnifiedCommand {
         }
         if (opts.dir !== undefined) {
           removeOptions.configDir = opts.dir;
+        }
+        if (opts.scope !== undefined) {
+          (removeOptions as any).scope = opts.scope;
         }
         if (opts.backup !== undefined) {
           removeOptions.backup = opts.backup;

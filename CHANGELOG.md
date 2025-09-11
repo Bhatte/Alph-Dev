@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Detection heuristics for agent providers (Windsurf, Codex, Gemini) are now strictly read-only. `detect()` only reads existing files and returns `null` when configs are absent or unreadable. No files or directories are created during detection (e.g., via `alph status`). Initialization is confined to the setup/configure flow.
+
+### Added
+- `alph status --dir <path>` now includes Claude project-level MCP servers alongside global ones and displays a `Scope: global|project` indicator.
+- Claude remove now supports scope-aware removal via `--scope <auto|global|project|all>`. The default `auto` removes from global and likely project roots (or a provided `--dir`).
+
+### Docs
+- README and USER_GUIDE updated with `status --dir` and `remove --scope` flags and examples.
+- Claude agent guide updated with scope and status notes, plus a restart hint after removal.
+- Windsurf agent guide updated to clarify read-only detection and that initialization happens exclusively during setup.
+- Gemini agent guide updated to clarify read-only detection semantics.
+
+### Notes
+- No breaking changes. Existing configure/setup flows are unchanged; status and remove gain additional clarity and control.
+
 ## [0.3.0] - 2025-09-10
 
 ### Added

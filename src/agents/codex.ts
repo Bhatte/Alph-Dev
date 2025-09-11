@@ -39,7 +39,6 @@ export class CodexProvider implements AgentProvider {
 
   async detect(configDir?: string): Promise<string | null> {
     const p = this.getDefaultConfigPath(configDir);
-    this.configPath = p;
     try {
       if (await FileOperations.fileExists(p)) {
         // Ensure it is readable text TOML by attempting parse
@@ -49,13 +48,16 @@ export class CodexProvider implements AgentProvider {
         if (raw && raw.trim().length > 0) {
           TOML.parse(raw);
         }
+        this.configPath = p;
         return p;
       }
-      // Not present yet; still return the path so we can create it on configure
-      return p;
+      // Do not implicitly initialize or report detection when file doesn't exist
+      this.configPath = null;
+      return null;
     } catch (e) {
-      // If parse fails, still consider detected (file exists), but return path
-      return p;
+      // Parse or access error => not detected
+      this.configPath = null;
+      return null;
     }
   }
 

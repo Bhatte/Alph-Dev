@@ -93,28 +93,10 @@ export class GeminiProvider implements AgentProvider {
         }
       }
       
-      // First try to detect existing config file
+      // Only treat as detected when an existing valid config file is found
       const detectedPath = await AgentDetector.detectConfigFile(possiblePaths);
-      if (detectedPath) {
-        this.configPath = detectedPath;
-        return detectedPath;
-      }
-      
-      // If no config file exists, check if gemini command is available
-      // This allows detection of installed but unconfigured Gemini CLI
-      try {
-        const { execSync } = require('child_process');
-        execSync('which gemini', { stdio: 'ignore' });
-        // If gemini command exists, return default config path
-        // The config file will be created when configured
-        const defaultPath = this.getDefaultConfigPath(configDir);
-        this.configPath = defaultPath;
-        return defaultPath;
-      } catch (commandError) {
-        // Gemini command not found
-        this.configPath = null;
-        return null;
-      }
+      this.configPath = detectedPath;
+      return detectedPath;
     } catch (error) {
       if (error instanceof Error) {
         throw error;

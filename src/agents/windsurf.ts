@@ -38,18 +38,18 @@ export class WindsurfProvider implements AgentProvider {
     const p = this.getDefaultConfigPath(configDir);
     try {
       if (await FileOperations.fileExists(p)) {
-        // Sanity: ensure readable JSON
+        // Ensure readable JSON
         await FileOperations.readJsonFile<unknown>(p);
         this.configPath = p;
         return p;
       }
-      // If file not present, we still consider Windsurf available upon request
-      // but return null so status won't try to read it.
-      this.configPath = p;
-      return p; // allow configuration to create it
+      // Do not implicitly initialize or report detection when file doesn't exist
+      this.configPath = null;
+      return null;
     } catch {
-      this.configPath = p;
-      return p;
+      // Parsing or access error means not detected
+      this.configPath = null;
+      return null;
     }
   }
 

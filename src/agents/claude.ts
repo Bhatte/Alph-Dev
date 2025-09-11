@@ -218,9 +218,89 @@ export class ClaudeProvider implements AgentProvider {
         throw new Error(`Configuration file not found: ${this.configPath}`);
       }
 
+      const scope = (config.scope || 'auto');
+      const serverId = config.mcpServerId;
+      const projectCandidates = await this.__candidateProjectDirs(config.configDir);
+
       const result = await SafeEditManager.safeEdit<ClaudeConfig>(
         this.configPath,
-        (claudeConfig) => this.removeMCPServerConfig(claudeConfig, config),
+        async (claudeConfig) => {
+          // Work on a copy
+          const modified: ClaudeConfig = { ...claudeConfig } as any;
+
+          const removeGlobal = () => {
+            if (modified.mcpServers && serverId in modified.mcpServers) {
+              const { [serverId]: _r, ...rest } = modified.mcpServers;
+              modified.mcpServers = rest as any;
+              return true;
+            }
+            return false;
+          };
+
+          const removeInProjectPath = (absPath: string): boolean => {
+            if (!modified.projects || typeof modified.projects !== 'object') return false;
+            const proj: any = (modified.projects as any)[absPath];
+            if (!proj || !proj.mcpServers || typeof proj.mcpServers !== 'object') return false;
+            const { [serverId]: _p, ...pRest } = proj.mcpServers as any;
+            const existed = serverId in (proj.mcpServers as any);
+            proj.mcpServers = pRest;
+            (modified.projects as any)[absPath] = proj;
+            return existed;
+          };
+
+          let removedAny = false;
+
+          switch (scope) {
+            case 'global': {
+              const ok = removeGlobal();
+              if (!ok) throw new Error(`MCP server '${serverId}' not found in global scope`);
+              removedAny = ok;
+              break;
+            }
+            case 'project': {
+              let removed = false;
+              for (const p of projectCandidates) {
+                removed = removeInProjectPath(p) || removed;
+              }
+              if (!removed) throw new Error(`MCP server '${serverId}' not found in project scope`);
+              removedAny = removed;
+              break;
+            }
+            case 'all': {
+              const g = removeGlobal();
+              let pr = false;
+              // If projects exist, remove across all projects
+              if (modified.projects && typeof modified.projects === 'object') {
+                for (const key of Object.keys(modified.projects as any)) {
+                  pr = removeInProjectPath(key) || pr;
+                }
+              }
+              if (!g && !pr) throw new Error(`MCP server '${serverId}' not found in any scope`);
+              removedAny = g || pr;
+              break;
+            }
+            case 'auto':
+            default: {
+              // Remove from global if present
+              const g = removeGlobal();
+              // Remove from provided or likely project roots
+              let pr = false;
+              for (const p of projectCandidates) {
+                pr = removeInProjectPath(p) || pr;
+              }
+              if (!g && !pr) throw new Error(`MCP server '${serverId}' not found`);
+              removedAny = g || pr;
+              break;
+            }
+          }
+
+          if (!removedAny) {
+            // Should not reach here due to throws above, but keep guard
+            throw new Error(`MCP server '${serverId}' not found`);
+          }
+
+          return modified;
+        },
         {
           validator: (modifiedConfig) => this.validateClaudeConfig(modifiedConfig),
           createBackup: backup,
@@ -278,11 +358,42 @@ export class ClaudeProvider implements AgentProvider {
    */
   async hasMCPServer(serverId: string, configDir?: string): Promise<boolean> {
     try {
+      // First check global or specified project
       const servers = await this.listMCPServers(configDir);
-      return servers.includes(serverId);
+      if (servers.includes(serverId)) return true;
+
+      // If no configDir provided, also check common project roots (cwd, git root)
+      if (!configDir || !configDir.trim()) {
+        const cfgPath = this.configPath || await this.getActiveConfigPath(undefined);
+        if (!cfgPath || !(await FileOperations.fileExists(cfgPath))) return false;
+        const cfg = await FileOperations.readJsonFile<ClaudeConfig>(cfgPath);
+        const candidates = await this.__candidateProjectDirs(undefined);
+        for (const p of candidates) {
+          const proj: any = (cfg.projects as any)?.[p];
+          if (proj && proj.mcpServers && typeof proj.mcpServers === 'object') {
+            if (serverId in proj.mcpServers) return true;
+          }
+        }
+      }
+      return false;
     } catch (error) {
       throw new Error(`Failed to check MCP server in Claude Code: ${error}`);
     }
+  }
+
+  /** Compute candidate project directories for scope=auto when a dir isn't explicitly provided */
+  private async __candidateProjectDirs(explicitDir?: string): Promise<string[]> {
+    const set = new Set<string>();
+    const add = (p?: string) => { if (p && p.trim()) set.add(resolve(p.trim())); };
+    add(explicitDir);
+    try { add(process.cwd()); } catch { /* ignore */ }
+    // Try to get git root
+    try {
+      const { execSync } = await import('child_process');
+      const root = execSync('git rev-parse --show-toplevel', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+      add(root);
+    } catch { /* not a git repo */ }
+    return Array.from(set.values());
   }
 
   /**
@@ -390,43 +501,8 @@ export class ClaudeProvider implements AgentProvider {
   }
 
   /**
-   * Removes MCP server configuration from the Claude Code configuration
-   * @param claudeConfig - Current Claude Code configuration
-   * @param config - MCP server removal configuration
-   * @returns Modified Claude Code configuration
-   * @throws Error if the server is not found
+   * (removeMCPServerConfig removed; removal logic is implemented inline in remove())
    */
-  private removeMCPServerConfig(claudeConfig: ClaudeConfig, config: RemovalConfig): ClaudeConfig {
-    // Create a copy of the configuration to avoid mutations
-    const modifiedConfig: ClaudeConfig = { ...claudeConfig };
-
-    // Check if mcpServers section exists
-    if (!modifiedConfig.mcpServers || typeof modifiedConfig.mcpServers !== 'object') {
-      throw new Error(`MCP server '${config.mcpServerId}' not found - no MCP servers configured`);
-    }
-
-    // Check if the specific server exists
-    if (!(config.mcpServerId in modifiedConfig.mcpServers)) {
-      throw new Error(`MCP server '${config.mcpServerId}' not found`);
-    }
-
-    // Create a new mcpServers object without the specified server (global)
-    const { [config.mcpServerId]: removedServer, ...remainingServers } = modifiedConfig.mcpServers;
-    modifiedConfig.mcpServers = remainingServers;
-
-    // Also remove from project-specific scope if a project directory was provided
-    if (config.configDir && config.configDir.trim() && modifiedConfig.projects && typeof modifiedConfig.projects === 'object') {
-      const projectPath = resolve(config.configDir.trim());
-      const proj: any = (modifiedConfig.projects as any)[projectPath];
-      if (proj && proj.mcpServers && typeof proj.mcpServers === 'object') {
-        const { [config.mcpServerId]: _pRemoved, ...pRemaining } = proj.mcpServers as any;
-        proj.mcpServers = pRemaining;
-        (modifiedConfig.projects as any)[projectPath] = proj;
-      }
-    }
-
-    return modifiedConfig;
-  }
 
   /**
    * Validates a Claude Code configuration structure

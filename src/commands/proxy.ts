@@ -98,7 +98,12 @@ export async function proxyHealth(opts: ProxyHealthOptions): Promise<number> {
         ui.error(`[alph] health: SSE handshake failed (status ${resp.status}, content-type ${ct})`);
         return 3;
       }
-      // Consider headers sufficient for health
+      // We validated SSE headers; now cancel the stream to avoid keeping the process alive.
+      try {
+        // Undici ReadableStream supports cancel(); swallow any errors
+        await (resp as any).body?.cancel?.();
+      } catch {}
+      try { controller.abort(); } catch {}
       return 0;
     }
   } catch (e) {

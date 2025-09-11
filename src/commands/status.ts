@@ -10,11 +10,13 @@ import { FileOperations } from '../utils/fileOps';
 import type { GeminiConfig, CursorConfig, ClaudeConfig, GenericConfig } from '../types/config';
 import type { ProviderDetectionResult } from '../agents/provider';
 import { ui } from '../utils/ui';
+import { resolve, join } from 'path';
 
 export interface StatusCommandOptions {
   format?: 'list' | 'json';
   agent?: string;
   problems?: boolean;
+  dir?: string;
 }
 
 type AnyConfig = GeminiConfig | CursorConfig | ClaudeConfig | GenericConfig | Record<string, unknown>;
@@ -22,6 +24,7 @@ type AnyConfig = GeminiConfig | CursorConfig | ClaudeConfig | GenericConfig | Re
 interface RedactedServerEntry {
   id: string;
   config: Record<string, unknown>;
+  scope?: 'global' | 'project';
 }
 
 interface ProviderStatus {
@@ -39,7 +42,7 @@ export async function executeStatusCommand(options: StatusCommandOptions = {}): 
     ? detectionResults.filter(d => d.provider.name.toLowerCase().includes(agentFilter))
     : detectionResults;
 
-  const providerStatuses: ProviderStatus[] = await buildProviderStatuses(filtered);
+  const providerStatuses: ProviderStatus[] = await buildProviderStatuses(filtered, options);
   const format = (options.format || 'list');
   if (format === 'json') {
     ui.info(JSON.stringify(providerStatuses, null, 2));
@@ -48,7 +51,7 @@ export async function executeStatusCommand(options: StatusCommandOptions = {}): 
   printList(providerStatuses, options);
 }
 
-async function buildProviderStatuses(detections: ProviderDetectionResult[]): Promise<ProviderStatus[]> {
+async function buildProviderStatuses(detections: ProviderDetectionResult[], options: StatusCommandOptions): Promise<ProviderStatus[]> {
   // Kick off parallel reads for detected ones
   const readPromises = detections.map(async (det) => {
     // Providers like Warp don't have a config file path but can be detected.
@@ -79,6 +82,44 @@ async function buildProviderStatuses(detections: ProviderDetectionResult[]): Pro
             // fallthrough to generic error below
           }
         }
+        return <ProviderStatus>{
+          name: det.provider.name,
+          detected: true,
+          configPath: det.configPath,
+          servers
+        };
+      }
+
+      // Claude: When --dir provided, include project-level servers with a scope column
+      if (det.provider.name === 'Claude Code') {
+        const servers: RedactedServerEntry[] = [];
+        const cfg = await FileOperations.readJsonFile<AnyConfig>(det.configPath);
+        const globalServers = extractMCPServers(cfg).map(({ id, config }) => ({ id, config: redactSensitive(config), scope: 'global' as const }));
+        servers.push(...globalServers);
+        const projectDir = (options.dir && options.dir.trim()) ? resolve(options.dir.trim()) : '';
+        if (projectDir) {
+          // From global config's projects map
+          const proj = (cfg as any)?.projects?.[projectDir];
+          if (proj && proj.mcpServers && typeof proj.mcpServers === 'object') {
+            for (const [id, value] of Object.entries(proj.mcpServers as Record<string, any>)) {
+              if (value && typeof value === 'object') {
+                servers.push({ id, config: redactSensitive(value as Record<string, unknown>), scope: 'project' });
+              }
+            }
+          }
+          // Also include local project file if present: <dir>/.claude/settings.local.json
+          const localPath = join(projectDir, '.claude', 'settings.local.json');
+          try {
+            if (await FileOperations.fileExists(localPath)) {
+              const localCfg = await FileOperations.readJsonFile<AnyConfig>(localPath);
+              const localServers = extractMCPServers(localCfg).map(({ id, config }) => ({ id, config: redactSensitive(config), scope: 'project' as const }));
+              servers.push(...localServers);
+            }
+          } catch {
+            // ignore local parse errors in status view
+          }
+        }
+
         return <ProviderStatus>{
           name: det.provider.name,
           detected: true,
@@ -228,7 +269,8 @@ function printList(statuses: ProviderStatus[], options: StatusCommandOptions): v
           const rawTransport = (explicit as string | undefined) || inferred;
           const endpoint = rawTransport === 'stdio' ? 'Local (STDIO)' : (c.httpUrl || c.url || 'N/A');
           const status = c.disabled === true ? 'disabled' : 'enabled';
-          ui.info(`  • \x1b[1m${entry.id}\x1b[0m — Endpoint: ${endpoint}; Transport: ${rawTransport || 'N/A'}; Status: ${status}`);
+          const scopeSuffix = entry.scope ? `; Scope: ${entry.scope}` : '';
+          ui.info(`  • \x1b[1m${entry.id}\x1b[0m — Endpoint: ${endpoint}; Transport: ${rawTransport || 'N/A'}; Status: ${status}${scopeSuffix}`);
         }
       } else {
         ui.info('  • MCP Servers: None configured');

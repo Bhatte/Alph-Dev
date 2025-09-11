@@ -1,4 +1,10 @@
 Claude Code MCP Integration
+ 
+Alph CLI Integration Notes
+•  Detection is read-only: Alph only considers Claude detected when an existing config file is present and readable. It will not create files during `alph status`.
+•  Status project view: `alph status --dir "/absolute/path/to/project"` lists Claude’s global and project-level MCP servers and shows a Scope column.
+•  Removal scopes: `alph remove --server-name <id> --scope <auto|global|project|all>` allows targeted deletion from global, specific project(s), all projects, or auto (global + likely project roots).
+•  Restart hint: After removal operations affecting Claude, restart Claude Desktop/CLI to apply changes.
 Overview: Claude Code (Anthropic’s coding assistant, available via Claude Desktop and CLI) can be extended with MCP servers to give Claude tools beyond its built-in capabilities[127][128]. For Alph CLI, integrating with Claude Code’s MCP system means understanding two modes: (1) configuring Claude (Desktop or CLI) to use external MCP servers, and (2) potentially using Claude Code itself as an MCP server for other clients[129]. Claude Code supports local and remote MCP servers similarly to Cursor/Gemini, with standard JSON-RPC protocol and three transports (stdio, SSE, HTTP) selectable[130][91]. However, its configuration spans multiple possible files and a slightly different schema.
 Platform Context and Configuration Files
 •	Claude Desktop (GUI) vs Claude CLI: Claude Code is accessible through a GUI application (Claude Desktop, for Mac and Windows) and a headless CLI (claude CLI, which runs on Mac/Linux and WSL). The underlying engine is the same, and both support MCP servers. The primary difference is how they are configured:

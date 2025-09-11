@@ -69,6 +69,15 @@ export interface RemovalConfig {
   
   /** Optional: whether to create a backup during removal (defaults to true if unspecified) */
   backup?: boolean;
+
+  /**
+   * Scope for removal operations. Defaults to 'auto'.
+   * - 'auto': remove from global and, if provided, the specified project; if not provided, attempt common roots (cwd, git root)
+   * - 'global': remove only from global scope
+   * - 'project': remove only from project scope (specified via configDir; if absent, try common roots)
+   * - 'all': remove from global and all project scopes present in the config
+   */
+  scope?: 'auto' | 'global' | 'project' | 'all';
 }
 
 /**
