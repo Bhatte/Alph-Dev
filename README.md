@@ -64,10 +64,17 @@ Alph detects and configures these agents out of the box:
 | Claude Code |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
 | Windsurf    |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
 | Warp        |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Codex CLI   |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
+| Codex CLI   |   ✅   |   ✅   |    ❌    |   ✅  |  ✅  |   ✅   |   |
 
 
 > **MCP Transports 101** — Hosts/agents connect to servers via **STDIO** (local), **HTTP**, or **SSE** (streaming HTTP). Alph supports all three and lets you pick the best per agent. 
+
+---
+---
+
+## Compatibility Notes
+
+**Codex CLI on Windows**: Currently not supported due to upstream compatibility issues with Codex CLI's process spawning and environment variable handling on Windows. This is not an Alph-specific limitation but rather a known issue in the Codex CLI implementation. Multiple issues are actively tracked in the Codex repository, including [#2555](https://github.com/openai/codex/issues/2555), [#3311](https://github.com/openai/codex/issues/3311), and [#3408](https://github.com/openai/codex/issues/3408). We recommend using Codex CLI on macOS or Linux for the best experience, or consider alternative agents like Cursor or Windsurf on Windows.
 
 ---
 
@@ -195,8 +202,6 @@ alph remove [options]
 * Feature request: [https://github.com/Aqualia/Alph/issues/new?template=feature\_request.yml](https://github.com/Aqualia/Alph/issues/new?template=feature_request.yml)
 * Bug report: [https://github.com/Aqualia/Alph/issues/new?template=bug\_report.yml](https://github.com/Aqualia/Alph/issues/new?template=bug_report.yml)
 * Code of Conduct: Contributor Covenant v2.1. Contact: [hello@aqualia.ie](mailto:hello@aqualia.ie).&#x20;
-
----
 
 ## License
 
