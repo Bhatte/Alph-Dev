@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2025-09-11
 
 ### Changed
 - Detection heuristics for agent providers (Windsurf, Codex, Gemini) are now strictly read-only. `detect()` only reads existing files and returns `null` when configs are absent or unreadable. No files or directories are created during detection (e.g., via `alph status`). Initialization is confined to the setup/configure flow.
@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - No breaking changes. Existing configure/setup flows are unchanged; status and remove gain additional clarity and control.
+
+## [Unreleased]
 
 ## [0.3.0] - 2025-09-10
 
