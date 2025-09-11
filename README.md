@@ -70,7 +70,6 @@ Alph detects and configures these agents out of the box:
 > **MCP Transports 101** — Hosts/agents connect to servers via **STDIO** (local), **HTTP**, or **SSE** (streaming HTTP). Alph supports all three and lets you pick the best per agent. 
 
 ---
----
 
 ## Compatibility Notes
 
