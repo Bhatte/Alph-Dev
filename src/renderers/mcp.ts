@@ -1,7 +1,7 @@
 export type Transport = 'http' | 'sse' | 'stdio';
 
 export interface RenderInput {
-  agent: 'cursor' | 'gemini' | 'claude' | 'windsurf' | 'warp';
+  agent: 'cursor' | 'gemini' | 'claude' | 'windsurf';
   serverId: string;
   transport: Transport;
   url?: string;
@@ -112,20 +112,6 @@ export function renderMcpServer(input: RenderInput): RenderOutput {
           ...(input.url ? { serverUrl: input.url } : {}),
           ...(nonEmpty(input.headers) ? { headers: input.headers } : {}),
           ...(nonEmpty(input.env) ? { env: input.env } : {})
-        };
-      }
-    } else if (agent === 'warp') {
-      if (transport === 'stdio') {
-        server = {
-          ...(input.command ? { command: input.command } : {}),
-          ...(input.args ? { args: input.args } : {}),
-          ...(nonEmpty(input.env) ? { env: input.env } : {})
-        };
-      } else {
-        // Warp UI/CLI accepts URL-based entries; include both url and serverUrl for compatibility
-        server = {
-          ...(input.url ? { url: input.url, serverUrl: input.url } : {}),
-          ...(nonEmpty(input.headers) ? { headers: input.headers } : {})
         };
       }
     } else {

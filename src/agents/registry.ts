@@ -12,7 +12,6 @@ import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
 import { WindsurfProvider } from './windsurf';
-import { WarpProvider } from './warp';
 import { CodexProvider } from './codex';
 import { ui } from '../utils/ui';
 
@@ -90,9 +89,8 @@ export class AgentRegistry {
     this.registerProvider(new GeminiProvider());
     this.registerProvider(new CursorProvider());
     this.registerProvider(new ClaudeProvider());
-    // New: Windsurf and Warp
+    // New: Windsurf
     this.registerProvider(new WindsurfProvider());
-    this.registerProvider(new WarpProvider());
     // New: Codex CLI
     this.registerProvider(new CodexProvider());
   }
@@ -1018,8 +1016,7 @@ export function createRegistryWithProviders(providerNames: string[]): AgentRegis
     'Cursor': () => new CursorProvider(),
     'Claude Code': () => new ClaudeProvider(),
     'Codex CLI': () => new CodexProvider(),
-    'Windsurf': () => new WindsurfProvider(),
-    'Warp': () => new WarpProvider()
+    'Windsurf': () => new WindsurfProvider()
   };
 
   // Register requested providers

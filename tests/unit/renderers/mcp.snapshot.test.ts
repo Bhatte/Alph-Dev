@@ -69,17 +69,5 @@ describe('Protocol-aware rendering snapshots', () => {
       renderMcpServer({ agent: 'windsurf', serverId: 'remote', transport: 'http', url: 'https://api.example.com/mcp', headers: hdr })
     ).toMatchSnapshot();
   });
-
-  // Warp
-  test('Warp STDIO', () => {
-    expect(
-      renderMcpServer({ agent: 'warp', serverId: 'local', transport: 'stdio', command: 'npx', args: ['-y','@mcp/local'], env })
-    ).toMatchSnapshot();
-  });
-  test('Warp HTTP', () => {
-    expect(
-      renderMcpServer({ agent: 'warp', serverId: 'remote', transport: 'http', url: 'https://api.example.com/mcp', headers: hdr })
-    ).toMatchSnapshot();
-  });
 });
 

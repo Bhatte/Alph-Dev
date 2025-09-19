@@ -135,37 +135,6 @@ exports[`Protocol-aware rendering snapshots Gemini STDIO 1`] = `
 }
 `;
 
-exports[`Protocol-aware rendering snapshots Warp HTTP 1`] = `
-{
-  "mcpServers": {
-    "remote": {
-      "headers": {
-        "Authorization": "Bearer \${TOKEN}",
-      },
-      "serverUrl": "https://api.example.com/mcp",
-      "url": "https://api.example.com/mcp",
-    },
-  },
-}
-`;
-
-exports[`Protocol-aware rendering snapshots Warp STDIO 1`] = `
-{
-  "mcpServers": {
-    "local": {
-      "args": [
-        "-y",
-        "@mcp/local",
-      ],
-      "command": "npx",
-      "env": {
-        "FOO": "bar",
-      },
-    },
-  },
-}
-`;
-
 exports[`Protocol-aware rendering snapshots Windsurf HTTP 1`] = `
 {
   "mcpServers": {

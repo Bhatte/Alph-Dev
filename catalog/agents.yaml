@@ -101,25 +101,3 @@ agents:
         shape: genericHTTP
         fields: { url: required, headers: optional }
         headerPolicyRef: bearer
-
-  - id: warp
-    displayName: Warp
-    writeMode: cli
-    scopes:
-      project:
-        pathTemplate: null
-      user:
-        pathTemplate: null
-    containerKey: mcpServers
-    protocolProfiles:
-      stdio:
-        shape: claudeStdio
-        fields: { command: required, args: optional, env: optional }
-      sse:
-        shape: genericHTTP
-        fields: { url: required, headers: optional }
-        headerPolicyRef: bearer
-      http:
-        shape: genericHTTP
-        fields: { url: required, headers: optional }
-        headerPolicyRef: bearer

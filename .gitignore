@@ -70,3 +70,6 @@ node_modules
 
 #documents 
 docs/agents
+
+#warp files
+WARP.md

@@ -52,19 +52,17 @@ Alph detects and configures these agents out of the box:
 * **Cursor**
 * **Claude Code**
 * **Windsurf**
-* **Warp**
-* **Codex CLI**&#x20;
+* **Codex CLI**
 
 **Compatibility Matrix (OS × Transport)**
 
-| Agent       | macOS | Linux | Windows | HTTP | SSE | STDIO |   |
-| ----------- | :---: | :---: | :-----: | :--: | :-: | :---: | - |
-| Gemini CLI  |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Cursor      |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Claude Code |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Windsurf    |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Warp        |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
-| Codex CLI   |   ✅   |   ✅   |    ❌    |   ✅  |  ✅  |   ✅   |   |
+|| Agent       | macOS | Linux | Windows | HTTP | SSE | STDIO |   |
+|| ----------- | :---: | :---: | :-----: | :--: | :-: | :---: | - |
+|| Gemini CLI  |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
+|| Cursor      |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
+|| Claude Code |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
+|| Windsurf    |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |   |
+|| Codex CLI   |   ✅   |   ✅   |    ❌    |   ✅  |  ✅  |   ✅   |   |
 
 
 > **MCP Transports 101** — Hosts/agents connect to servers via **STDIO** (local), **HTTP**, or **SSE** (streaming HTTP). Alph supports all three and lets you pick the best per agent. 
