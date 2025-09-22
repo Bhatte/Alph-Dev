@@ -102,8 +102,12 @@ export async function proxyHealth(opts: ProxyHealthOptions): Promise<number> {
       try {
         // Undici ReadableStream supports cancel(); swallow any errors
         await (resp as any).body?.cancel?.();
-      } catch {}
-      try { controller.abort(); } catch {}
+      } catch {
+        // Intentionally ignore cancellation errors
+      }
+      try { controller.abort(); } catch {
+        // Intentionally ignore abort errors
+      }
       return 0;
     }
   } catch (e) {
