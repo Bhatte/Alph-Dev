@@ -1,3 +1,11 @@
+## [0.4.3](https://github.com/Aqualia/Alph/compare/v0.4.2...v0.4.3) (2025-09-22)
+
+
+### Bug Fixes
+
+* **catalog:** resolve package root correctly across all execution contexts ([81fdbe4](https://github.com/Aqualia/Alph/commit/81fdbe4f0b8c49b0c080204c946b4a921533aade))
+* **test:** use os.tmpdir() for cross-platform Windows compatibility ([1aea6d9](https://github.com/Aqualia/Alph/commit/1aea6d9efa465cf190bfaca7872175916060f100))
+
 ## [0.4.2](https://github.com/Aqualia/Alph/compare/v0.4.1...v0.4.2) (2025-09-22)
 
 
