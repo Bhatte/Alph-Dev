@@ -197,9 +197,9 @@ export class InteractiveConfigurator {
         name: 'transport',
         message: 'How do you want to connect to the MCP server?',
         choices: [
-          { name: 'Local tool (STDIO)', value: 'stdio' },
-          { name: 'Remote over HTTP', value: 'http' },
-          { name: 'Remote over SSE', value: 'sse' }
+          { name: '🔧 Local tool (STDIO) - Run MCP servers on your machine (no authentication needed)', value: 'stdio' },
+          { name: '🌐 Remote server (HTTP) - Connect to hosted MCP servers (may require authentication)', value: 'http' },
+          { name: '📡 Remote server (SSE) - Connect to hosted MCP servers with real-time streaming', value: 'sse' }
         ],
         default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? 'stdio' : 'http',
         prefix: '> '
@@ -207,20 +207,26 @@ export class InteractiveConfigurator {
       {
         type: 'input',
         name: 'httpUrl',
-        message: 'Enter the MCP server endpoint URL:',
+        message: 'Enter the remote MCP server endpoint URL:',
         when: (ans: any) => ans.transport !== 'stdio',
-        prefix: '?? ',
+        prefix: '🔗 ',
+        suffix: (ans: any) => {
+          if (ans.transport === 'sse') return ' (e.g., https://api.example.com/mcp/sse)';
+          if (ans.transport === 'http') return ' (e.g., https://api.example.com/mcp)';
+          return '';
+        },
         validate: (input: string) => {
-          try { new URL(input); return true; } catch { return 'Please enter a valid URL.'; }
+          try { new URL(input); return true; } catch { return 'Please enter a valid URL (including https://).'; }
         }
       },
       ...(supportsBearer
         ? [{
             type: 'password',
             name: 'bearer',
-            message: 'Authentication Token (Optional):',
+            message: 'Authentication Token (Optional) - Bearer token or API key for the remote server:',
             prefix: '> ',
             mask: '*',
+            when: (ans: any) => ans.transport !== 'stdio', // Only show for remote transports
             validate: () => true,
             suffix: ' (Leave blank for public servers)'
           }]
@@ -241,7 +247,7 @@ export class InteractiveConfigurator {
       if (!catalog.tools || catalog.tools.length === 0) {
         throw new Error('No STDIO tools found in catalog');
       }
-      const customChoice = { name: 'Custom command.', value: '__custom__' } as const;
+      const customChoice = { name: '🎯 Custom command - Run any MCP server command you want', value: '__custom__' } as const;
       // Deduplicate tools by id
       const uniqueIds = new Set<string>();
       const uniqueTools = catalog.tools.filter(t => {
@@ -249,20 +255,29 @@ export class InteractiveConfigurator {
         uniqueIds.add(t.id);
         return true;
       });
-      // Show custom at top always
-      const toolChoices = [customChoice, ...uniqueTools.map(t => ({ name: t.id, value: t.id }))];
+      // Show custom at top, then popular tools with clear descriptions
+      const toolChoices = [
+        customChoice,
+        ...uniqueTools.map(t => ({ name: `📦 ${t.id} — ${t.meta?.notes || 'MCP server'}`, value: t.id }))
+      ];
       const { toolId } = await inquirer.prompt({
         type: 'list',
         name: 'toolId',
-        message: 'Select a local MCP server tool to use:',
+        message: 'Choose a local MCP server to run:',
         choices: toolChoices,
-        default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? customChoice.value : (toolChoices[0]?.value ?? customChoice.value),
-        prefix: '> '
+        default: customChoice.value, // Default to custom for maximum flexibility
+        prefix: '🔧 ',
+        pageSize: 12
       });
       if (toolId === '__custom__') {
+        ui.info('\n💡 Setting up a custom MCP server command. Examples:');
+        ui.info('  - npx @modelcontextprotocol/server-filesystem /path/to/allowed/directory');
+        ui.info('  - node my-mcp-server.js');
+        ui.info('  - python -m my_mcp_package');
+        ui.info('');
         const custom = await inquirer.prompt([
-          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '> ', validate: (s: string) => !!s || 'Command is required.' },
-          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '> ', default: '' }
+          { type: 'input', name: 'cmd', message: 'Command executable (e.g., npx, node, python):', prefix: '> ', validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (space or comma separated):', prefix: '> ', default: '', suffix: ' (e.g., @modelcontextprotocol/server-filesystem /allowed/path)' }
         ]);
         const args = (custom.args as string)
           .split(/[\s,]+/)
@@ -319,7 +334,12 @@ export class InteractiveConfigurator {
       }
       let invoke = chooseDefaultInvocation(tool, det);
       // Offer quick recommended settings path if a tool is selected and detected
-      const { quick } = await inquirer.prompt({ type: 'confirm', name: 'quick', message: 'Use recommended settings?', default: true });
+      const { quick } = await inquirer.prompt({ 
+        type: 'confirm', 
+        name: 'quick', 
+        message: `Use recommended settings for ${tool.id}? (${invoke.command} ${(invoke.args || []).join(' ')})`, 
+        default: true 
+      });
       if (quick) {
         return {
           name: answers['name'],

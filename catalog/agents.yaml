@@ -101,3 +101,25 @@ agents:
         shape: genericHTTP
         fields: { url: required, headers: optional }
         headerPolicyRef: bearer
+
+  - id: kiro
+    displayName: Kiro
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.kiro/settings/mcp.json"
+      user:
+        pathTemplate: "${home}/.kiro/settings/mcp.json"
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: kiroStdio
+        fields: { command: required, args: required, env: optional }
+      sse:
+        shape: kiroRemote
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: kiroRemote
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer

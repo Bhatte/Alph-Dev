@@ -1,7 +1,7 @@
 export type Transport = 'http' | 'sse' | 'stdio';
 
 export interface RenderInput {
-  agent: 'cursor' | 'gemini' | 'claude' | 'windsurf';
+  agent: 'cursor' | 'gemini' | 'claude' | 'windsurf' | 'kiro';
   serverId: string;
   transport: Transport;
   url?: string;
@@ -33,7 +33,7 @@ export function renderMcpServer(input: RenderInput): RenderOutput {
       server = {
         ...(input.command ? { command: input.command } : {}),
         ...(input.args ? { args: input.args } : {}),
-        ...(input.env ? { env: input.env } : {})
+        ...(nonEmpty(input.env) ? { env: input.env } : {})
       };
     } else if (transport === 'sse') {
       server = {
@@ -80,6 +80,7 @@ export function renderMcpServer(input: RenderInput): RenderOutput {
   } else if (agent === 'claude') {
     if (transport === 'stdio') {
       server = {
+        transport: 'stdio',
         ...(input.command ? { command: input.command } : {}),
         ...(input.args ? { args: input.args } : {}),
         ...(nonEmpty(input.env) ? { env: input.env } : {})
@@ -97,11 +98,64 @@ export function renderMcpServer(input: RenderInput): RenderOutput {
         ...(nonEmpty(input.headers) ? { headers: input.headers } : {})
       };
     }
+  } else if (agent === 'kiro') {
+    // Kiro has a unique approach: always uses command/args (STDIO-style)
+    // but for remote endpoints, uses mcp-remote wrapper
+    if (transport === 'stdio') {
+      // Native STDIO server
+      server = {
+        ...(input.command ? { command: input.command } : {}),
+        ...(input.args ? { args: input.args } : {}),
+        ...(nonEmpty(input.env) ? { env: input.env } : {}),
+        disabled: false,
+        autoApprove: []
+      };
+    } else {
+      // Remote endpoints use mcp-remote wrapper
+      const mcpRemoteArgs = ['mcp-remote'];
+      if (input.url) {
+        mcpRemoteArgs.push(input.url);
+      }
+      // Convert transport to mcp-remote format
+      let mcpRemoteTransport: string = transport;
+      if (transport === 'sse') {
+        mcpRemoteTransport = 'sse-only';
+      } else if (transport === 'http') {
+        mcpRemoteTransport = 'http-only';
+      }
+      mcpRemoteArgs.push('--transport', mcpRemoteTransport);
+      
+      // Add headers using --header flag for mcp-remote
+      const env = { ...input.env };
+      if (input.headers) {
+        Object.entries(input.headers).forEach(([key, value]) => {
+          // For Authorization header, use environment variable substitution to avoid Windows spaces issue
+          if (key.toLowerCase() === 'authorization') {
+            mcpRemoteArgs.push('--header');
+            mcpRemoteArgs.push(`Authorization:\${AUTH_HEADER}`); // No spaces around ':' to avoid Windows issues
+            env['AUTH_HEADER'] = String(value); // Keep the original authorization header format
+          } else {
+            // For other headers, use direct format (assuming no spaces in common header names)
+            mcpRemoteArgs.push('--header');
+            mcpRemoteArgs.push(`${key}: ${value}`);
+          }
+        });
+      }
+      
+      server = {
+        command: 'npx',
+        args: mcpRemoteArgs,
+        ...(Object.keys(env).length > 0 ? { env } : {}),
+        disabled: false,
+        autoApprove: []
+      };
+    }
   } else {
     // Additional agent-specific shapes
     if (agent === 'windsurf') {
       if (transport === 'stdio') {
         server = {
+          transport: 'stdio',
           ...(input.command ? { command: input.command } : {}),
           ...(input.args ? { args: input.args } : {}),
           ...(nonEmpty(input.env) ? { env: input.env } : {})

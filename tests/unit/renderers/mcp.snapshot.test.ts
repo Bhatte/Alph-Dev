@@ -69,5 +69,22 @@ describe('Protocol-aware rendering snapshots', () => {
       renderMcpServer({ agent: 'windsurf', serverId: 'remote', transport: 'http', url: 'https://api.example.com/mcp', headers: hdr })
     ).toMatchSnapshot();
   });
+
+  // Kiro
+  test('Kiro STDIO', () => {
+    expect(
+      renderMcpServer({ agent: 'kiro', serverId: 'aws-docs', transport: 'stdio', command: 'uvx', args: ['awslabs.aws-documentation-mcp-server@latest'], env: { FASTMCP_LOG_LEVEL: 'ERROR' } })
+    ).toMatchSnapshot();
+  });
+  test('Kiro SSE (via mcp-remote)', () => {
+    expect(
+      renderMcpServer({ agent: 'kiro', serverId: 'remote-sse', transport: 'sse', url: 'https://api.example.com/mcp/sse', headers: hdr })
+    ).toMatchSnapshot();
+  });
+  test('Kiro HTTP (via mcp-remote)', () => {
+    expect(
+      renderMcpServer({ agent: 'kiro', serverId: 'remote-http', transport: 'http', url: 'https://api.example.com/mcp', headers: hdr })
+    ).toMatchSnapshot();
+  });
 });
 

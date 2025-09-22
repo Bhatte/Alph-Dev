@@ -47,10 +47,14 @@ pids
 .tmp/
 .temp/
 
-# Documentation source (keep README.md)
+# Documentation source (only exclude docs/ folder, include specific .md files listed in package.json)
 docs/
-*.md
-!README.md
+
+# Include specific docs that are in package.json files field:
+# README.md, USER_GUIDE.md, ARCHITECTURE.md, SECURITY.md, TROUBLESHOOTING.md, CHANGELOG.md
+
+# Exclude other docs
+CONTRIBUTING.md
 
 # Spec files
 .kiro/
@@ -61,8 +65,3 @@ archive/
 # Scripts
 scripts/
 Makefile
-
-# Other project files
-CONTRIBUTING.md
-TROUBLESHOOTING.md
-USER_GUIDE.md

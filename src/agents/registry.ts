@@ -13,6 +13,7 @@ import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
 import { WindsurfProvider } from './windsurf';
 import { CodexProvider } from './codex';
+import { KiroProvider } from './kiro';
 import { ui } from '../utils/ui';
 
 /**
@@ -93,6 +94,8 @@ export class AgentRegistry {
     this.registerProvider(new WindsurfProvider());
     // New: Codex CLI
     this.registerProvider(new CodexProvider());
+    // New: Kiro
+    this.registerProvider(new KiroProvider());
   }
 
   /**
@@ -1016,7 +1019,8 @@ export function createRegistryWithProviders(providerNames: string[]): AgentRegis
     'Cursor': () => new CursorProvider(),
     'Claude Code': () => new ClaudeProvider(),
     'Codex CLI': () => new CodexProvider(),
-    'Windsurf': () => new WindsurfProvider()
+    'Windsurf': () => new WindsurfProvider(),
+    'Kiro': () => new KiroProvider()
   };
 
   // Register requested providers

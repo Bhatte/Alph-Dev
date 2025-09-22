@@ -1,30 +1,51 @@
-import { dirname, join } from 'path';
+import { join } from 'path';
 import { AgentProvider, AgentConfig, RemovalConfig } from './provider';
-import { CursorConfig } from '../types/config';
-import { BackupInfo } from '../utils/backup';
 import { FileOperations } from '../utils/fileOps';
-import { BackupManager } from '../utils/backup';
+import { BackupManager, BackupInfo } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
 import { resolveConfigPath } from '../catalog/adapter';
+import { ui } from '../utils/ui';
 
 /**
- * Cursor IDE provider for configuring Cursor's MCP server settings
- * 
- * This provider handles detection and configuration of Cursor IDE,
- * which stores its configuration in platform-specific locations:
- * - Windows: %APPDATA%\Cursor\User\settings.json
- * - macOS: ~/Library/Application Support/Cursor/User/settings.json
- * - Linux: ~/.config/Cursor/User/settings.json
+ * Kiro configuration structure for MCP servers
  */
-export class CursorProvider implements AgentProvider {
-  public readonly name = 'Cursor';
+export interface KiroConfig {
+  mcpServers?: Record<string, KiroMCPServer>;
+  [key: string]: unknown; // Allow other configuration keys
+}
+
+/**
+ * Kiro MCP server configuration
+ */
+export interface KiroMCPServer {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  disabled?: boolean;
+  autoApprove?: string[];
+}
+
+/**
+ * Kiro AI coding assistant provider for configuring Kiro's MCP server settings
+ * 
+ * This provider handles detection and configuration of Kiro,
+ * which stores its configuration in platform-specific locations:
+ * - User (global): ~/.kiro/settings/mcp.json
+ * - Project (workspace): <project>/.kiro/settings/mcp.json
+ * 
+ * Kiro uses a workspace-over-user precedence model and only supports
+ * STDIO transport natively. Remote endpoints are handled via mcp-remote wrapper.
+ */
+export class KiroProvider implements AgentProvider {
+  public readonly name = 'Kiro';
   
   private configPath: string | null = null;
   private lastBackup: BackupInfo | null = null;
+  private lastValidationReason: string | null = null;
 
   /**
-   * Creates a new Cursor provider instance
+   * Creates a new Kiro provider instance
    */
   constructor() {
     // Initialize with default config path for current platform
@@ -32,39 +53,33 @@ export class CursorProvider implements AgentProvider {
   }
 
   /**
-   * Gets the default configuration path for Cursor based on the current platform
-   * @param configDir - Optional custom configuration directory
-   * @returns Default path to Cursor settings.json
+   * Gets the default configuration path for Kiro based on the current platform
+   * @param configDir - Optional custom configuration directory (for project scope)
+   * @returns Default path to Kiro mcp.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
+    // Prefer explicit env override when set
+    const envOverride = AgentDetector.getEnvOverridePath('kiro');
+    if (envOverride) return envOverride;
+    
+    // Use catalog-derived path
     if (configDir && configDir.trim()) {
-      return resolveConfigPath('cursor', 'project', configDir) || join(configDir, '.cursor', 'mcp.json');
+      return resolveConfigPath('kiro', 'project', configDir) || join(configDir, '.kiro', 'settings', 'mcp.json');
     }
-    return resolveConfigPath('cursor', 'user') || AgentDetector.getDefaultConfigPath('cursor');
+    
+    return resolveConfigPath('kiro', 'user') || AgentDetector.getDefaultConfigPath('kiro');
   }
 
   /**
-   * Gets alternative configuration paths to check for Cursor installation
-   * @returns Array of possible configuration paths, with ~/.cursor/mcp.json as the primary location
+   * Gets alternative configuration paths to check for Kiro installation
+   * @returns Array of possible configuration paths
    */
   protected getAlternativeConfigPaths(): string[] {
-    const home = require('os').homedir();
-    const primaryPath = require('path').join(home, '.cursor', 'mcp.json');
-    const otherPaths = AgentDetector.getDetectionCandidates('cursor').filter(p => p !== primaryPath);
-    return [primaryPath, ...otherPaths];
+    return AgentDetector.getDetectionCandidates('kiro');
   }
 
   /**
-   * Determines if a given path points to a legacy settings.json-based location
-   * rather than the preferred ~/.cursor/mcp.json file.
-   */
-  private isLegacySettingsPath(p: string | null | undefined): boolean {
-    if (!p) return false;
-    return /(^|[/\\])settings\.json$/i.test(p);
-  }
-
-  /**
-   * Detects if Cursor IDE is installed and configured on the system
+   * Detects if Kiro is installed and configured on the system
    * 
    * @param configDir - Optional custom configuration directory
    * @returns Promise resolving to the configuration file path if detected, null if not found
@@ -88,6 +103,7 @@ export class CursorProvider implements AgentProvider {
       }
       
       const possiblePaths = this.getAlternativeConfigPaths();
+      
       // If any candidate exists but is not readable, throw (tests expect this behavior)
       for (const p of possiblePaths) {
         try {
@@ -102,6 +118,8 @@ export class CursorProvider implements AgentProvider {
           throw new Error(String(innerErr));
         }
       }
+      
+      // Only treat as detected when an existing valid config file is found
       const detectedPath = await AgentDetector.detectConfigFile(possiblePaths);
       this.configPath = detectedPath;
       return detectedPath;
@@ -109,7 +127,7 @@ export class CursorProvider implements AgentProvider {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error(`Failed to detect Cursor IDE: ${error}`);
+      throw new Error(`Failed to detect Kiro: ${error}`);
     }
   }
 
@@ -118,13 +136,13 @@ export class CursorProvider implements AgentProvider {
    * @param configDir - Optional custom configuration directory
    */
   async getActiveConfigPath(configDir?: string): Promise<string | null> {
-    const p = await AgentDetector.detectActiveConfigPath('cursor', configDir);
+    const p = await AgentDetector.detectActiveConfigPath('kiro', configDir);
     this.configPath = p;
     return p;
   }
 
   /**
-   * Configures the detected Cursor IDE with the provided MCP server settings
+   * Configures the detected Kiro with the provided MCP server settings
    * 
    * This method implements the safe edit lifecycle:
    * 1. Create backup of existing configuration
@@ -148,36 +166,31 @@ export class CursorProvider implements AgentProvider {
       this.configPath = detectedPath || this.getDefaultConfigPath();
     }
 
-    // If no explicit configDir is provided, prefer the official ~/.cursor/mcp.json file
-    // even if a legacy settings.json was detected. We do not migrate existing data here.
-    if (!config.configDir || !config.configDir.trim()) {
-      const preferredPath = this.getDefaultConfigPath();
-      if (this.isLegacySettingsPath(this.configPath) && this.configPath !== preferredPath) {
-        this.configPath = preferredPath;
-      }
-    }
-
     if (!this.configPath) {
-      throw new Error('Unable to determine Cursor configuration path');
+      throw new Error('Unable to determine Kiro configuration path');
     }
 
     try {
-      // Ensure the directory exists before attempting to write
-      await FileOperations.ensureDirectory(dirname(this.configPath));
+      // Ensure the directory exists and is accessible before attempting to write
+      await AgentDetector.ensureConfigDirectory(this.configPath);
       
       // Use safe edit manager to perform the configuration update
-      const result = await SafeEditManager.safeEdit<CursorConfig>(
+      const result = await SafeEditManager.safeEdit<KiroConfig>(
         this.configPath,
-        (cursorConfig) => this.injectMCPServerConfig(cursorConfig, config),
+        (kiroConfig) => this.injectMCPServerConfig(kiroConfig, config),
         {
-          validator: (modifiedConfig) => this.validateCursorConfig(modifiedConfig, config),
+          validator: (modifiedConfig) => this.validateKiroConfig(modifiedConfig, config),
           createBackup: backup,
           autoRollback: true
         }
       );
 
       if (!result.success) {
-        throw result.error || new Error('Configuration update failed');
+        const reason = this.lastValidationReason ? `: ${this.lastValidationReason}` : '';
+        if (result.error) {
+          throw new Error((result.error.message || String(result.error)) + reason);
+        }
+        throw new Error('Configuration update failed' + reason);
       }
 
       // Store backup info for potential rollback
@@ -187,12 +200,12 @@ export class CursorProvider implements AgentProvider {
       return backup && result.backupInfo ? result.backupInfo.backupPath : undefined;
 
     } catch (error) {
-      throw new Error(`Failed to configure Cursor IDE: ${error}`);
+      throw new Error(`Failed to configure Kiro: ${error}`);
     }
   }
 
   /**
-   * Validates the current Cursor configuration
+   * Validates the current Kiro configuration
    * 
    * Verifies:
    * - Configuration file exists and is readable
@@ -217,10 +230,10 @@ export class CursorProvider implements AgentProvider {
       }
 
       // Try to parse the configuration
-      const config = await FileOperations.readJsonFile<CursorConfig>(this.configPath);
+      const config = await FileOperations.readJsonFile<KiroConfig>(this.configPath);
       
       // Basic structure validation
-      return this.validateCursorConfig(config);
+      return this.validateKiroConfig(config);
 
     } catch (error) {
       // Any error during validation means the configuration is invalid
@@ -229,7 +242,7 @@ export class CursorProvider implements AgentProvider {
   }
 
   /**
-   * Removes an MCP server configuration from the detected Cursor IDE
+   * Removes an MCP server configuration from the detected Kiro
    * 
    * This method implements the safe edit lifecycle:
    * 1. Create backup of existing configuration
@@ -248,12 +261,12 @@ export class CursorProvider implements AgentProvider {
     if (!this.configPath) {
       const detectedPath = await this.detect(config.configDir);
       if (!detectedPath) {
-        throw new Error('Cursor IDE configuration not found');
+        throw new Error('Kiro configuration not found');
       }
     }
 
     if (!this.configPath) {
-      throw new Error('Unable to determine Cursor configuration path');
+      throw new Error('Unable to determine Kiro configuration path');
     }
 
     try {
@@ -263,11 +276,11 @@ export class CursorProvider implements AgentProvider {
       }
 
       // Use safe edit manager to perform the removal
-      const result = await SafeEditManager.safeEdit<CursorConfig>(
+      const result = await SafeEditManager.safeEdit<KiroConfig>(
         this.configPath,
-        (cursorConfig) => this.removeMCPServerConfig(cursorConfig, config),
+        (kiroConfig) => this.removeMCPServerConfig(kiroConfig, config),
         {
-          validator: (modifiedConfig) => this.validateCursorConfig(modifiedConfig),
+          validator: (modifiedConfig) => this.validateKiroConfig(modifiedConfig),
           createBackup: backup,
           autoRollback: true
         }
@@ -284,12 +297,12 @@ export class CursorProvider implements AgentProvider {
       return backup && result.backupInfo ? result.backupInfo.backupPath : undefined;
 
     } catch (error) {
-      throw new Error(`Failed to remove MCP server from Cursor IDE: ${error}`);
+      throw new Error(`Failed to remove MCP server from Kiro: ${error}`);
     }
   }
 
   /**
-   * Lists all MCP server configurations present in the Cursor IDE configuration
+   * Lists all MCP server configurations present in the Kiro configuration
    * 
    * @param configDir - Optional custom configuration directory
    * @returns Promise resolving to an array of MCP server IDs, empty array if none found
@@ -305,7 +318,7 @@ export class CursorProvider implements AgentProvider {
       }
 
       // Read and parse the configuration
-      const config = await FileOperations.readJsonFile<CursorConfig>(configPath);
+      const config = await FileOperations.readJsonFile<KiroConfig>(configPath);
       
       // Return the list of MCP server IDs
       if (!config.mcpServers || typeof config.mcpServers !== 'object') {
@@ -314,12 +327,12 @@ export class CursorProvider implements AgentProvider {
 
       return Object.keys(config.mcpServers);
     } catch (error) {
-      throw new Error(`Failed to list MCP servers from Cursor IDE: ${error}`);
+      throw new Error(`Failed to list MCP servers from Kiro: ${error}`);
     }
   }
 
   /**
-   * Checks if a specific MCP server configuration exists in the Cursor IDE
+   * Checks if a specific MCP server configuration exists in Kiro
    * 
    * @param serverId - The MCP server ID to check for
    * @param configDir - Optional custom configuration directory
@@ -331,7 +344,7 @@ export class CursorProvider implements AgentProvider {
       const servers = await this.listMCPServers(configDir);
       return servers.includes(serverId);
     } catch (error) {
-      throw new Error(`Failed to check MCP server in Cursor IDE: ${error}`);
+      throw new Error(`Failed to check MCP server in Kiro: ${error}`);
     }
   }
 
@@ -383,19 +396,19 @@ export class CursorProvider implements AgentProvider {
       }
 
     } catch (error) {
-      throw new Error(`Failed to rollback Cursor configuration: ${error}`);
+      throw new Error(`Failed to rollback Kiro configuration: ${error}`);
     }
   }
 
   /**
-   * Injects MCP server configuration into the Cursor configuration
-   * @param cursorConfig - Current Cursor configuration
+   * Injects MCP server configuration into the Kiro configuration
+   * @param kiroConfig - Current Kiro configuration
    * @param config - MCP server configuration to inject
-   * @returns Modified Cursor configuration
+   * @returns Modified Kiro configuration
    */
-  private async injectMCPServerConfig(cursorConfig: CursorConfig, config: AgentConfig): Promise<CursorConfig> {
+  private async injectMCPServerConfig(kiroConfig: KiroConfig, config: AgentConfig): Promise<KiroConfig> {
     // Create a copy of the configuration to avoid mutations
-    const modifiedConfig: CursorConfig = { ...cursorConfig };
+    const modifiedConfig: KiroConfig = { ...kiroConfig };
 
     // Initialize mcpServers section if it doesn't exist
     if (!modifiedConfig.mcpServers) {
@@ -405,32 +418,39 @@ export class CursorProvider implements AgentProvider {
     // Render protocol-aware shape and inject
     const { renderMcpServer } = await import('../renderers/mcp.js');
     const input: any = {
-      agent: 'cursor',
+      agent: 'kiro',
       serverId: config.mcpServerId,
-      transport: (config.transport as any) || 'http',
+      transport: (config.transport as any) || 'stdio', // Kiro defaults to STDIO
       headers: config.headers,
       command: config.command,
       args: config.args,
-      env: config.env
+      cwd: config.cwd,
+      env: config.env,
+      timeout: config.timeout
     };
-    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    
+    // Only set URL for remote transports (will be converted to mcp-remote)
+    if (config.mcpServerUrl && config.transport !== 'stdio') {
+      input.url = config.mcpServerUrl;
+    }
+    
     const rendered = renderMcpServer(input);
     const serverEntry = (rendered as any)['mcpServers'][config.mcpServerId];
-    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as any;
+    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as KiroMCPServer;
 
     return modifiedConfig;
   }
 
   /**
-   * Removes MCP server configuration from the Cursor configuration
-   * @param cursorConfig - Current Cursor configuration
+   * Removes MCP server configuration from the Kiro configuration
+   * @param kiroConfig - Current Kiro configuration
    * @param config - MCP server removal configuration
-   * @returns Modified Cursor configuration
+   * @returns Modified Kiro configuration
    * @throws Error if the server is not found
    */
-  private removeMCPServerConfig(cursorConfig: CursorConfig, config: RemovalConfig): CursorConfig {
+  private removeMCPServerConfig(kiroConfig: KiroConfig, config: RemovalConfig): KiroConfig {
     // Create a copy of the configuration to avoid mutations
-    const modifiedConfig: CursorConfig = { ...cursorConfig };
+    const modifiedConfig: KiroConfig = { ...kiroConfig };
 
     // Check if mcpServers section exists
     if (!modifiedConfig.mcpServers || typeof modifiedConfig.mcpServers !== 'object') {
@@ -450,66 +470,70 @@ export class CursorProvider implements AgentProvider {
   }
 
   /**
-   * Validates a Cursor configuration structure
+   * Validates a Kiro configuration structure
    * @param config - Configuration to validate
    * @param expectedMCPConfig - Optional expected MCP configuration for validation
    * @returns True if configuration is valid, false otherwise
    */
-  private validateCursorConfig(config: CursorConfig, expectedMCPConfig?: AgentConfig): boolean {
+  private validateKiroConfig(config: KiroConfig, expectedMCPConfig?: AgentConfig): boolean {
     try {
+      const DBG = process?.env?.['ALPH_DEBUG_KIRO'] === '1';
+      const log = (reason: string, extra?: unknown) => {
+        if (DBG) {
+          try {
+            ui.debug(`[Kiro.validate] ${reason}` + (extra !== undefined ? ` :: ${JSON.stringify(extra)}` : ''));
+          } catch {
+            // noop
+          }
+        }
+      };
+      const fail = (reason: string, extra?: unknown) => {
+        try {
+          this.lastValidationReason = extra !== undefined ? `${reason} ${JSON.stringify(extra)}` : reason;
+        } catch {
+          this.lastValidationReason = reason;
+        }
+        log(reason, extra);
+        return false as const;
+      };
+
       // Basic structure validation
       if (typeof config !== 'object' || config === null) {
-        return false;
+        return fail('config is not an object or is null');
       }
 
       // If mcpServers exists, validate its structure
       if (config.mcpServers) {
         if (typeof config.mcpServers !== 'object' || config.mcpServers === null) {
-          return false;
+          return fail('mcpServers is not an object');
         }
 
         // Validate each MCP server configuration
-        for (const [, serverConfig] of Object.entries(config.mcpServers)) {
+        for (const [serverId, serverConfig] of Object.entries(config.mcpServers)) {
           if (typeof serverConfig !== 'object' || serverConfig === null) {
-            return false;
+            return fail('serverConfig is not an object', { serverId });
           }
 
-          // Validate URL fields
-          if (serverConfig.url && typeof serverConfig.url !== 'string') {
-            return false;
+          // Validate required fields for Kiro
+          if (!serverConfig.command || typeof serverConfig.command !== 'string') {
+            return fail('command is required and must be a string', { serverId });
           }
 
-          if (serverConfig.httpUrl && typeof serverConfig.httpUrl !== 'string') {
-            return false;
+          if (!Array.isArray(serverConfig.args)) {
+            return fail('args must be an array', { serverId });
           }
 
           // Validate optional fields
-          if (serverConfig.headers && typeof serverConfig.headers !== 'object') {
-            return false;
-          }
-
-          if (serverConfig.transport && !['http', 'sse', 'stdio'].includes(serverConfig.transport)) {
-            return false;
-          }
-
-          // For STDIO configurations (inferred from command presence), validate structure
-          if (serverConfig.command) {
-            // Command must be a non-empty string
-            if (typeof serverConfig.command !== 'string' || serverConfig.command.trim() === '') {
-              return false;
-            }
-            // Args must be an array when present
-            if (serverConfig.args && !Array.isArray(serverConfig.args)) {
-              return false;
-            }
+          if (serverConfig.env && typeof serverConfig.env !== 'object') {
+            return fail('env present but not an object', { serverId });
           }
 
           if (serverConfig.disabled !== undefined && typeof serverConfig.disabled !== 'boolean') {
-            return false;
+            return fail('disabled present but not boolean', { serverId, disabled: serverConfig.disabled });
           }
 
           if (serverConfig.autoApprove && !Array.isArray(serverConfig.autoApprove)) {
-            return false;
+            return fail('autoApprove present but not an array', { serverId });
           }
         }
 
@@ -517,38 +541,36 @@ export class CursorProvider implements AgentProvider {
         if (expectedMCPConfig) {
           const serverConfig = config.mcpServers[expectedMCPConfig.mcpServerId];
           if (!serverConfig) {
-            return false;
+            return fail('expected serverId not found', { serverId: expectedMCPConfig.mcpServerId });
           }
 
-          // Validate based on expected transport
-          if (expectedMCPConfig.transport === 'stdio') {
-            // For STDIO, check that command is present (Cursor STDIO doesn't use transport field)
-            if (!serverConfig.command) {
-              return false;
+          // For STDIO transport, validate command matches if provided
+          if (expectedMCPConfig.transport === 'stdio' && expectedMCPConfig.command) {
+            if (serverConfig.command !== expectedMCPConfig.command) {
+              return fail('expected command mismatch', { expected: expectedMCPConfig.command, actual: serverConfig.command });
             }
-            if (expectedMCPConfig.command && serverConfig.command !== expectedMCPConfig.command) {
-              return false;
-            }
-          } else {
-            // http/sse: URL should match when provided
-            if (expectedMCPConfig.mcpServerUrl &&
-                serverConfig.url !== expectedMCPConfig.mcpServerUrl && 
-                serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
-              return false;
-            }
-            // Determine effective transport: prefer explicit transport, then 'type', then infer
-            const effectiveTransport = (serverConfig.transport as any)
-              || ((serverConfig as any).type as any)
-              || (serverConfig.command ? 'stdio' : (serverConfig.httpUrl || serverConfig.url ? 'http' : undefined));
-            if (expectedMCPConfig.transport && effectiveTransport !== expectedMCPConfig.transport) {
-              return false;
+          }
+
+          // For remote transports, validate mcp-remote wrapper is used
+          if (expectedMCPConfig.transport !== 'stdio' && expectedMCPConfig.mcpServerUrl) {
+            // Check if mcp-remote is used either in command or as first arg
+            const usesMcpRemote = serverConfig.command.includes('mcp-remote') || 
+              (Array.isArray(serverConfig.args) && serverConfig.args.length > 0 && 
+               serverConfig.args[0] === 'mcp-remote');
+            if (!usesMcpRemote) {
+              return fail('remote transport should use mcp-remote wrapper', { serverId: expectedMCPConfig.mcpServerId, command: serverConfig.command, args: serverConfig.args });
             }
           }
         }
       }
 
+      log('validation passed');
       return true;
     } catch (error) {
+      const DBG = process?.env?.['ALPH_DEBUG_KIRO'] === '1';
+      if (DBG) {
+        ui.debug('[Kiro.validate] exception during validation ' + (error instanceof Error ? error.message : String(error)));
+      }
       return false;
     }
   }

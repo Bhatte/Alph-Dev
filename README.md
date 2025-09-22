@@ -9,10 +9,17 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@aqualia/alph-cli"><img alt="npm" src="https://img.shields.io/npm/v/@aqualia/alph-cli"></a>
   <a href="https://www.npmjs.com/package/@aqualia/alph-cli"><img alt="downloads" src="https://img.shields.io/npm/dm/@aqualia/alph-cli"></a>
+  <a href="https://github.com/Aqualia/Alph"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Aqualia/Alph?style=social"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
 </p>
 
 
+
+## The Problem You Know Too Well
+
+Every AI agent speaks a different configuration language. Cursor wants JSON in `~/.cursor/mcp.json`. Claude expects it in `./.mcp.json`. Gemini uses `~/.gemini/settings.json`. One typo breaks everything. No backups. No validation. Manual editing is error-prone and time-consuming.
+
+You've probably been there: copy-pasting server URLs, fixing bracket mismatches, and restarting your IDE hoping it works this time. What should take 30 seconds becomes a 30-minute debugging session.
 
 ## Why Alph?
 
@@ -24,23 +31,96 @@ Modern AI agents speak **MCP (Model Context Protocol)**, but wiring them up stil
 
 ## Demo
 
+### Quick Example
+```bash
+# Connect Cursor to your MCP server in one command
+alph setup --mcp-server-endpoint https://api.example.com/mcp --bearer your-key --agents cursor
+
+# ✅ Detects Cursor installation
+# ✅ Validates configuration
+# ✅ Creates timestamped backup
+# ✅ Writes config atomically
+# ✅ Verifies everything works
+```
+
+### Before vs After
+
+<table>
+<tr>
+<th>😰 Manual Way (Error-Prone)</th>
+<th>😌 Alph Way (Bulletproof)</th>
+</tr>
+<tr>
+<td>
+
+```bash
+# Find the right config file
+code ~/.cursor/mcp.json
+# Hope the syntax is right...
+{
+  "mcpServers": {
+    "myserver": {
+      "url": "https://api.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer sk-..."
+      }
+    }
+  }
+}
+# Restart IDE, cross fingers 🤞
+```
+
+</td>
+<td>
+
+```bash
+# One command, works everywhere
+alph setup \
+  --mcp-server-endpoint https://api.example.com/mcp \
+  --bearer sk-your-key \
+  --agents cursor
+
+# ✅ Auto-detects Cursor
+# ✅ Creates backup
+# ✅ Validates JSON
+# ✅ Atomic write
+# ✅ Auto-rollback on error
+# Done! 🎉
+```
+
+</td>
+</tr>
+</table>
+
+### Interactive Demo
 ![Alph Demo](demo-alph.gif)
 
 *A quick wizard run: detect agents → choose transport → write configs → validate → done.*&#x20;
 
-## Installation
+## Try in 30 Seconds ⚡
 
 ```bash
-# Global install (recommended)
-npm install -g @aqualia/alph-cli
-
-# Or try without installing
+# No installation needed - try it now
 npx @aqualia/alph-cli@latest
+
+# Or connect to your MCP server instantly:
+npx @aqualia/alph-cli@latest setup \
+  --mcp-server-endpoint https://your-server.com/mcp \
+  --bearer your-api-key \
+  --agents cursor,claude
 ```
 
-Then run `alph` to launch the interactive wizard.&#x20;
+**Requirements**: Node.js ≥ 18
 
-**Requirements**: Node.js ≥ 18.&#x20;
+### Permanent Installation (if you like it)
+
+```bash
+# Global install for repeated use
+npm install -g @aqualia/alph-cli
+
+# Then just run:
+alph
+```
 
 ---
 
@@ -53,6 +133,7 @@ Alph detects and configures these agents out of the box:
 * **Claude Code**
 * **Windsurf**
 * **Codex CLI**
+* **Kiro** (`~/.kiro/settings/mcp.json`)
 
 **Compatibility Matrix (OS × Transport)**
 
@@ -63,6 +144,7 @@ Alph detects and configures these agents out of the box:
 | Claude Code |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |
 | Windsurf    |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |
 | Codex CLI   |   ✅   |   ✅   |    ❌    |   ✅  |  ✅  |   ✅   |
+| Kiro        |   ✅   |   ✅   |    ✅    |   ✅  |  ✅  |   ✅   |
 
 
 > **MCP Transports 101** — Hosts/agents connect to servers via **STDIO** (local), **HTTP**, or **SSE** (streaming HTTP). Alph supports all three and lets you pick the best per agent. 

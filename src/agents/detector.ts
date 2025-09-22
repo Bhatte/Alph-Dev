@@ -10,7 +10,7 @@ import { FileOperations } from '../utils/fileOps';
  */
 export class AgentDetector {
   /** Supported agent identifiers for unified resolver helpers */
-  static readonly agents = ['cursor', 'claude', 'gemini'] as const;
+  static readonly agents = ['cursor', 'claude', 'gemini', 'kiro'] as const;
 
   // Gemini
   static getGeminiDefaultConfigPath(): string {
@@ -94,7 +94,7 @@ export class AgentDetector {
   /**
    * Returns environment override variable names for an agent.
    */
-  private static getEnvOverrideVarNames(agent: 'cursor' | 'claude' | 'gemini'): string[] {
+  private static getEnvOverrideVarNames(agent: 'cursor' | 'claude' | 'gemini' | 'kiro'): string[] {
     const upper = agent.toUpperCase();
     return [
       `ALPH_${upper}_CONFIG`,
@@ -102,7 +102,7 @@ export class AgentDetector {
   }
 
   /** Returns a single explicit override path from env if provided, else null. */
-  static getEnvOverridePath(agent: 'cursor' | 'claude' | 'gemini'): string | null {
+  static getEnvOverridePath(agent: 'cursor' | 'claude' | 'gemini' | 'kiro'): string | null {
     const vars = this.getEnvOverrideVarNames(agent);
     for (const v of vars) {
       const val = process.env[v];
@@ -114,12 +114,14 @@ export class AgentDetector {
   }
 
   /** Unified default file path per agent. */
-  static getDefaultConfigPath(agent: 'cursor' | 'claude' | 'gemini'): string {
+  static getDefaultConfigPath(agent: 'cursor' | 'claude' | 'gemini' | 'kiro'): string {
     switch (agent) {
       case 'cursor':
         return this.getCursorDefaultConfigPath();
       case 'claude':
         return this.getClaudeDefaultConfigPath();
+      case 'kiro':
+        return this.getKiroDefaultConfigPath();
       case 'gemini':
       default:
         return this.getGeminiDefaultConfigPath();
@@ -127,12 +129,14 @@ export class AgentDetector {
   }
 
   /** Unified candidate paths list per agent. */
-  static getConfigPaths(agent: 'cursor' | 'claude' | 'gemini'): string[] {
+  static getConfigPaths(agent: 'cursor' | 'claude' | 'gemini' | 'kiro'): string[] {
     switch (agent) {
       case 'cursor':
         return this.getCursorConfigPaths();
       case 'claude':
         return this.getClaudeConfigPaths();
+      case 'kiro':
+        return this.getKiroConfigPaths();
       case 'gemini':
       default:
         return [this.getGeminiDefaultConfigPath()];
@@ -142,10 +146,32 @@ export class AgentDetector {
   /**
    * Returns detection candidates, with env override (if any) taking precedence.
    */
-  static getDetectionCandidates(agent: 'cursor' | 'claude' | 'gemini'): string[] {
+  static getDetectionCandidates(agent: 'cursor' | 'claude' | 'gemini' | 'kiro'): string[] {
     const envPath = this.getEnvOverridePath(agent);
     const base = this.getConfigPaths(agent);
     return envPath ? [envPath, ...base] : base;
+  }
+
+  // Kiro default path: ~/.kiro/settings/mcp.json
+  static getKiroDefaultConfigPath(): string {
+    const home = homedir();
+    return resolve(join(home, '.kiro', 'settings', 'mcp.json'));
+  }
+
+  static getKiroConfigPaths(): string[] {
+    const home = homedir();
+    const paths: string[] = [];
+
+    // Primary path
+    paths.push(join(home, '.kiro', 'settings', 'mcp.json'));
+
+    // Alternative/fallback paths (in case of different installations)
+    paths.push(
+      join(home, '.kiro', 'mcp.json'),
+      join(home, '.kiro', 'config', 'mcp.json')
+    );
+
+    return paths.map(p => resolve(p));
   }
 
   // Claude Code default path is consistent across platforms: ~/.claude.json
@@ -205,7 +231,7 @@ export class AgentDetector {
    * @param agent - The agent to detect config path for
    * @param configDir - Optional custom configuration directory
    */
-  static async detectActiveConfigPath(agent: 'cursor' | 'claude' | 'gemini', configDir?: string): Promise<string | null> {
+  static async detectActiveConfigPath(agent: 'cursor' | 'claude' | 'gemini' | 'kiro', configDir?: string): Promise<string | null> {
     // If custom config directory is provided, check it first
     if (configDir) {
       let customPath: string | null = null;
@@ -221,6 +247,9 @@ export class AgentDetector {
           // Check common project-local file first, then fallback to top-level .claude.json
           customPath = join(configDir, '.claude', 'settings.local.json');
           // If not present, detectActiveConfigPath will continue to scan candidates
+          break;
+        case 'kiro':
+          customPath = join(configDir, '.kiro', 'settings', 'mcp.json');
           break;
       }
       
@@ -253,6 +282,8 @@ export class AgentDetector {
           } else if (agent === 'claude') {
             extra.push(join(root, '.claude.json'));
             extra.push(join(root, '.claude', 'settings.local.json'));
+          } else if (agent === 'kiro') {
+            extra.push(join(root, '.kiro', 'settings', 'mcp.json'));
           }
         }
         candidates = [...extra.map(p => resolve(p)), ...candidates];

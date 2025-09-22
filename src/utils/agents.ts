@@ -15,7 +15,8 @@ const ALIASES: Record<string, string> = {
   'codex-cli': 'Codex CLI',
   codexcli: 'Codex CLI',
   windsurf: 'Windsurf',
-  'codeium-windsurf': 'Windsurf'
+  'codeium-windsurf': 'Windsurf',
+  kiro: 'Kiro'
 };
 
 export function parseAgentNames(agentList?: string | string[]): string[] {

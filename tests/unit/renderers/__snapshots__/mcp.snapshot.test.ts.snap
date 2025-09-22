@@ -40,6 +40,7 @@ exports[`Protocol-aware rendering snapshots Claude STDIO 1`] = `
       "env": {
         "FOO": "bar",
       },
+      "transport": "stdio",
     },
   },
 }
@@ -135,6 +136,70 @@ exports[`Protocol-aware rendering snapshots Gemini STDIO 1`] = `
 }
 `;
 
+exports[`Protocol-aware rendering snapshots Kiro HTTP (via mcp-remote) 1`] = `
+{
+  "mcpServers": {
+    "remote-http": {
+      "args": [
+        "mcp-remote",
+        "https://api.example.com/mcp",
+        "--transport",
+        "http-only",
+        "--header",
+        "Authorization:\${AUTH_HEADER}",
+      ],
+      "autoApprove": [],
+      "command": "npx",
+      "disabled": false,
+      "env": {
+        "AUTH_HEADER": "Bearer \${TOKEN}",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Kiro SSE (via mcp-remote) 1`] = `
+{
+  "mcpServers": {
+    "remote-sse": {
+      "args": [
+        "mcp-remote",
+        "https://api.example.com/mcp/sse",
+        "--transport",
+        "sse-only",
+        "--header",
+        "Authorization:\${AUTH_HEADER}",
+      ],
+      "autoApprove": [],
+      "command": "npx",
+      "disabled": false,
+      "env": {
+        "AUTH_HEADER": "Bearer \${TOKEN}",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Kiro STDIO 1`] = `
+{
+  "mcpServers": {
+    "aws-docs": {
+      "args": [
+        "awslabs.aws-documentation-mcp-server@latest",
+      ],
+      "autoApprove": [],
+      "command": "uvx",
+      "disabled": false,
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+      },
+    },
+  },
+}
+`;
+
 exports[`Protocol-aware rendering snapshots Windsurf HTTP 1`] = `
 {
   "mcpServers": {
@@ -160,6 +225,7 @@ exports[`Protocol-aware rendering snapshots Windsurf STDIO 1`] = `
       "env": {
         "FOO": "bar",
       },
+      "transport": "stdio",
     },
   },
 }

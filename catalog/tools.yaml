@@ -18,7 +18,7 @@ tools:
       version: { command: "github-mcp --version" }
       probe:   { command: "github-mcp --help" }
     meta:
-      notes: "GitHub integration. Requires a personal access token."
+      notes: "Access GitHub repositories, issues, and PRs through AI"
       envPrompts:
         - key: "GITHUB_TOKEN"
           label: "GitHub Personal Access Token"
@@ -41,7 +41,7 @@ tools:
     health:
       version: { command: "npx -y @modelcontextprotocol/server-filesystem --help" }
     meta:
-      notes: "Filesystem server; supply allowed directories as args during customization."
+      notes: "Read and write files in specified directories"
 
   - id: "memory-mcp"
     bin: "npx"
@@ -60,7 +60,7 @@ tools:
     health:
       version: { command: "npx -y @modelcontextprotocol/server-memory --help" }
     meta:
-      notes: "Ephemeral in‑memory tool server."
+      notes: "Store and retrieve information in memory during conversations"
 
   - id: "playwright-mcp"
     bin: "playwright-mcp"
@@ -80,7 +80,7 @@ tools:
       version: { command: "playwright-mcp --version" }
       probe:   { command: "playwright-mcp --help" }
     meta:
-      notes: "Headless browser automation via Playwright."
+      notes: "Automate web browsers for testing and web scraping"
 
   - id: "mcp-proxy-supergateway"
     bin: "npx"
@@ -101,4 +101,4 @@ tools:
       preWarm: { command: "npx -y supergateway --help" }
       probeHttp: { command: "npx -y supergateway --streamableHttp https://example.invalid --help" }
     meta:
-      notes: "STDIO ↔ Streamable HTTP/SSE proxy. Default pin: v3.4.0 (rollback to 3.2.0 behavior). Override with --proxy-version if needed."
+      notes: "Convert local MCP servers to HTTP/SSE endpoints for remote access"

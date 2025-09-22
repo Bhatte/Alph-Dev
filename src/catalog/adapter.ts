@@ -3,7 +3,7 @@ import os from 'os';
 import { defaultCatalogLoader } from './loader';
 import { AgentEntry } from './loader';
 
-export type AgentId = 'cursor' | 'gemini' | 'claude';
+export type AgentId = 'cursor' | 'gemini' | 'claude' | 'kiro';
 export type Scope = 'project' | 'user';
 
 function findAgent(agentId: AgentId): AgentEntry | undefined {
@@ -49,6 +49,10 @@ export function resolveConfigPath(
       return scope === 'project'
         ? path.join(projectDir || process.cwd(), '.claude', 'settings.local.json')
         : path.join(home, '.claude.json');
+    case 'kiro':
+      return scope === 'project'
+        ? path.join(projectDir || process.cwd(), '.kiro', 'settings', 'mcp.json')
+        : path.join(home, '.kiro', 'settings', 'mcp.json');
     default:
       return null;
   }
