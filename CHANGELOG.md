@@ -1,3 +1,15 @@
+## [0.4.2](https://github.com/Aqualia/Alph/compare/v0.4.1...v0.4.2) (2025-09-22)
+
+
+### Bug Fixes
+
+* trigger release for corrected version numbering ([71757a8](https://github.com/Aqualia/Alph/commit/71757a8a7df5542cf31e72cf242d5834e0dedd3d))
+
+
+### Reverts
+
+* reset version from 1.0.0 to 0.4.1 ([740476b](https://github.com/Aqualia/Alph/commit/740476bae7d7d836f347f4423e9cb95928eda6d4))
+
 # [0.4.1](https://github.com/Aqualia/Alph/compare/v0.3.2...v0.4.1) (2025-09-22)
 
 ### Features
