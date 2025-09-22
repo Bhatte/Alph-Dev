@@ -1,6 +1,6 @@
 {
   "name": "@aqualia/alph-cli",
-  "version": "1.0.0",
+  "version": "0.4.1",
   "description": "Alph CLI - Universal MCP server management for AI agents. Configure Gemini, Cursor, Claude and other AI tools with MCP servers.",
   "main": "dist/index.js",
   "bin": {
