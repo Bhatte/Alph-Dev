@@ -1,3 +1,22 @@
+# [1.0.0](https://github.com/Aqualia/Alph/compare/v0.3.2...v1.0.0) (2025-09-22)
+
+
+### Bug Fixes
+
+* correct compatibility matrix table formatting in README ([542d47f](https://github.com/Aqualia/Alph/commit/542d47f28fc35ace368531a2c6ae48f3ee5f27ab))
+* resolve ESLint errors in proxy command ([a6e3766](https://github.com/Aqualia/Alph/commit/a6e376647469ba14bba8f09b9618619662888485))
+* resolve GitHub Actions permissions and README table formatting ([fd06d0e](https://github.com/Aqualia/Alph/commit/fd06d0e9e2a56f16eaea9e931854a03ee8ab212a))
+
+
+### Features
+
+* enhance README with problem/solution clarity and conversion-focused quick start ([98fed40](https://github.com/Aqualia/Alph/commit/98fed40cbe978eb4c665abf7dec86e6b85fcdfcd))
+
+
+### BREAKING CHANGES
+
+* None - all changes are additive and improve user experience
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
