@@ -1,8 +1,8 @@
 import fs from 'fs';
-import path from 'path';
 import Ajv, { ErrorObject } from 'ajv';
 import { parse as parseYAML } from 'yaml';
 import { expandPathTemplate } from '../utils/pathTemplates';
+import { resolvePackagePath } from '../utils/packageRoot';
 
 export interface HeaderPolicy {
   headerName: string;
@@ -66,8 +66,8 @@ export class CatalogLoader {
   }
 
   load(options: LoadOptions = {}): AgentsCatalog {
-    const filePath = options.filePath ?? path.resolve(process.cwd(), 'catalog', 'agents.yaml');
-    const schemaPath = options.schemaPath ?? path.resolve(process.cwd(), 'schema', 'agents.schema.json');
+    const filePath = options.filePath ?? resolvePackagePath('catalog', 'agents.yaml');
+    const schemaPath = options.schemaPath ?? resolvePackagePath('schema', 'agents.schema.json');
 
     const rawYaml = fs.readFileSync(filePath, 'utf8');
     const data = parseYAML(rawYaml) as AgentsCatalog;

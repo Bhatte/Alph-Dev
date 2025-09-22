@@ -1,7 +1,7 @@
 import fs from 'fs';
-import path from 'path';
 import Ajv, { ErrorObject } from 'ajv';
 import { parse as parseYAML } from 'yaml';
+import { resolvePackagePath } from '../utils/packageRoot';
 
 export interface ToolInstaller { type: string; command: string }
 export interface ToolHealthCmd { command: string }
@@ -43,9 +43,9 @@ export class ToolsCatalogLoader {
     this.ajv = new Ajv({ allErrors: true, strict: false });
   }
 
-  load(cwd: string = process.cwd(), filePath?: string, schemaPath?: string): ToolsCatalog {
-    const f = filePath ?? path.resolve(cwd, 'catalog', 'tools.yaml');
-    const s = schemaPath ?? path.resolve(cwd, 'schema', 'tools.schema.json');
+  load(filePath?: string, schemaPath?: string): ToolsCatalog {
+    const f = filePath ?? resolvePackagePath('catalog', 'tools.yaml');
+    const s = schemaPath ?? resolvePackagePath('schema', 'tools.schema.json');
     const data = parseYAML(fs.readFileSync(f, 'utf8')) as ToolsCatalog;
     const schema = JSON.parse(fs.readFileSync(s, 'utf8'));
 
