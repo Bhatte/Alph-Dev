@@ -45,52 +45,9 @@ alph setup --mcp-server-endpoint https://api.example.com/mcp --bearer your-key -
 
 ### Before vs After
 
-<table>
-<tr>
-<th>😰 Manual Way (Error-Prone)</th>
-<th>😌 Alph Way (Bulletproof)</th>
-</tr>
-<tr>
-<td>
-
-```bash
-# Find the right config file
-code ~/.cursor/mcp.json
-# Hope the syntax is right...
-{
-  "mcpServers": {
-    "myserver": {
-      "url": "https://api.example.com/mcp",
-      "headers": {
-        "Authorization": "Bearer sk-..."
-      }
-    }
-  }
-}
-# Restart IDE, cross fingers 🤞
-```
-
-</td>
-<td>
-
-```bash
-# One command, works everywhere
-alph setup \
-  --mcp-server-endpoint https://api.example.com/mcp \
-  --bearer sk-your-key \
-  --agents cursor
-
-# ✅ Auto-detects Cursor
-# ✅ Creates backup
-# ✅ Validates JSON
-# ✅ Atomic write
-# ✅ Auto-rollback on error
-# Done! 🎉
-```
-
-</td>
-</tr>
-</table>
+| 😰 **Manual Way** (Error-Prone) | 😌 **Alph Way** (Bulletproof) |
+|---|---|
+| **Find config file:** `~/.cursor/mcp.json`<br>**Edit by hand:** Risk syntax errors<br>**Manual restart:** Hope it works 🤞<br><br>```json<br>{<br>  "mcpServers": {<br>    "myserver": {<br>      "url": "https://api.example.com/mcp",<br>      "headers": {<br>        "Authorization": "Bearer sk-..."<br>      }<br>    }<br>  }<br>}<br>```<br>❌ No validation<br>❌ No backups<br>❌ Easy to break | **One command:** Works everywhere<br><br>```bash<br>alph setup \<br>  --mcp-server-endpoint https://api.example.com/mcp \<br>  --bearer sk-your-key \<br>  --agents cursor<br>```<br><br>✅ Auto-detects agents<br>✅ Creates backups<br>✅ Validates config<br>✅ Atomic writes<br>✅ Auto-rollback on error<br>✅ **Done!** 🎉 |
 
 ### Interactive Demo
 ![Alph Demo](demo-alph.gif)
