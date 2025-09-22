@@ -1,6 +1,7 @@
 import { findPackageRoot, getPackageRoot, resolvePackagePath } from '../../../src/utils/packageRoot';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 describe('packageRoot utilities', () => {
   describe('findPackageRoot', () => {
@@ -20,8 +21,8 @@ describe('packageRoot utilities', () => {
       const originalCwd = process.cwd();
       
       try {
-        // Change to a different directory
-        const tempDir = '/tmp';
+        // Change to a different directory (cross-platform)
+        const tempDir = os.tmpdir();
         process.chdir(tempDir);
         
         // Should still find the correct package root
@@ -69,8 +70,8 @@ describe('packageRoot utilities', () => {
         // Get path from original directory
         const catalogPath1 = resolvePackagePath('catalog', 'agents.yaml');
         
-        // Change to different directory
-        process.chdir('/tmp');
+        // Change to different directory (cross-platform)
+        process.chdir(os.tmpdir());
         
         // Should still resolve to same path
         const catalogPath2 = resolvePackagePath('catalog', 'agents.yaml');
