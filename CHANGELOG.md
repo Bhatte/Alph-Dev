@@ -1,4 +1,4 @@
-## [0.4.4](https://github.com/Aqualia/Alph/compare/v0.4.3...v0.4.4) (2025-09-30)
+## [1.0.1](https://github.com/Aqualia/Alph/compare/v0.4.3...v1.0.1) (2025-09-30)
 
 ### Bug Fixes
 
