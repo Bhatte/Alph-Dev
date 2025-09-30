@@ -60,9 +60,13 @@ export function findPackageRoot(): string {
   }
   
   throw new Error(
-    `Could not find Alph package root. Searched from ${__dirname} upward. ` +
+    `Could not find Alph package root (@aqualia/alph-cli). Searched from ${__dirname} upward. ` +
     `Platform: ${process.platform}, attempts: ${attempts}, max: ${maxAttempts}. ` +
-    `This might indicate a packaging issue or unsupported installation method.`
+    `This usually indicates one of the following issues:\n` +
+    `1. The package was not properly installed - try reinstalling with 'npm install -g @aqualia/alph-cli@latest'\n` +
+    `2. You're running from an unsupported location - try running from your home directory\n` +
+    `3. The package files are corrupted or incomplete\n` +
+    `\nFor support, please visit: https://github.com/Aqualia/Alph/issues`
   );
 }
 

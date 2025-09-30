@@ -1,3 +1,17 @@
+## [0.4.4](https://github.com/Aqualia/Alph/compare/v0.4.3...v0.4.4) (2025-09-30)
+
+### Bug Fixes
+
+* **stdio:** fix ENOENT error when installing STDIO MCP servers ([#issue](https://github.com/Aqualia/Alph/issues/issue))
+  - Add catalog/ and schema/ directories to npm package files array
+  - Implement robust fallback mechanism for missing catalog files
+  - Enhance Windows compatibility with npx.cmd command normalization
+  - Improve error handling with actionable troubleshooting guidance
+  - Ensure seamless STDIO MCP server setup across all supported agents
+* **catalog:** add embedded fallback catalog with essential MCP tools
+* **windows:** improve command detection and normalization for better npx compatibility
+* **errors:** enhance error messages with specific recovery instructions
+
 ## [0.4.3](https://github.com/Aqualia/Alph/compare/v0.4.2...v0.4.3) (2025-09-22)
 
 

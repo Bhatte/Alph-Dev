@@ -13,8 +13,13 @@ function which(cmd: string): boolean {
   const isWin = process.platform === 'win32';
   try {
     if (isWin) {
-      const r = spawnSync('where', [cmd], { stdio: 'ignore' });
-      return r.status === 0;
+      // On Windows, try both the bare command and with .cmd extension
+      const variations = [cmd, `${cmd}.cmd`, `${cmd}.exe`];
+      for (const variant of variations) {
+        const r = spawnSync('where', [variant], { stdio: 'ignore' });
+        if (r.status === 0) return true;
+      }
+      return false;
     } else {
       const r = spawnSync('which', [cmd], { stdio: 'ignore' });
       return r.status === 0;
@@ -24,11 +29,19 @@ function which(cmd: string): boolean {
   }
 }
 
+function normalizeCommand(cmd: string): string {
+  // On Windows, ensure npx uses the .cmd extension for better compatibility
+  if (process.platform === 'win32' && cmd === 'npx' && which('npx.cmd')) {
+    return 'npx.cmd';
+  }
+  return cmd;
+}
+
 function splitCommand(cmd: string): { command: string; args: string[] } {
   const parts = cmd.split(' ').filter(Boolean);
   const head = parts[0] || '';
   const rest = parts.length > 1 ? parts.slice(1) : [];
-  return { command: head, args: rest };
+  return { command: normalizeCommand(head), args: rest };
 }
 
 export function detectTool(tool: ToolEntry): DetectResult {
@@ -51,7 +64,7 @@ export function chooseDefaultInvocation(tool: ToolEntry, detected?: DetectResult
   // If the tool exposes a dedicated binary and it is installed, prefer it
   const genericRunners = new Set(['npx', 'node', 'php', 'python', 'python3']);
   if (detected?.installed && detected.command === tool.bin && !genericRunners.has(tool.bin)) {
-    return { command: tool.bin, args: [] };
+    return { command: normalizeCommand(tool.bin), args: [] };
   }
 
   // Prefer a discovery command whose head is available on PATH
@@ -70,8 +83,8 @@ export function chooseDefaultInvocation(tool: ToolEntry, detected?: DetectResult
     return { command, args };
   }
 
-  // Last resort: return bin with no args
-  return { command: tool.bin, args: [] };
+  // Last resort: return normalized bin with no args
+  return { command: normalizeCommand(tool.bin), args: [] };
 }
 
 export async function installTool(tool: ToolEntry, preferred?: InstallManager): Promise<void> {
