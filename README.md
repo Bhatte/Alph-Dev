@@ -45,13 +45,7 @@ alph setup --mcp-server-endpoint https://api.example.com/mcp --bearer your-key -
 
 ### Before vs After
 
-<table>
-<tr>
-<th>😰 Manual Way (Error-Prone)</th>
-<th>😌 Alph Way (Bulletproof)</th>
-</tr>
-<tr>
-<td>
+#### 😰 Manual Way (Error-Prone)
 
 **Find config file:** `~/.cursor/mcp.json`
 
@@ -72,12 +66,13 @@ alph setup --mcp-server-endpoint https://api.example.com/mcp --bearer your-key -
 }
 ```
 
-❌ No validation  
-❌ No backups  
+❌ No validation
+❌ No backups
 ❌ Easy to break
 
-</td>
-<td>
+---
+
+#### 😌 Alph Way (Bulletproof)
 
 **One command:** Works everywhere
 
@@ -88,16 +83,12 @@ alph setup \
   --agents cursor
 ```
 
-✅ Auto-detects agents  
-✅ Creates backups  
-✅ Validates config  
-✅ Atomic writes  
-✅ Auto-rollback on error  
+✅ Auto-detects agents
+✅ Creates backups
+✅ Validates config
+✅ Atomic writes
+✅ Auto-rollback on error
 ✅ **Done!** 🎉
-
-</td>
-</tr>
-</table>
 
 ### Interactive Demo
 ![Alph Demo](demo-alph.gif)
